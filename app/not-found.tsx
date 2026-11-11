@@ -1,0 +1,2 @@
+import Link from "next/link";
+export default function NotFound() { return <main id="main" className="mx-auto max-w-xl px-6 py-24"><p className="text-sm text-muted-foreground">404 / PÁGINA NÃO ENCONTRADA</p><h1 className="display-heading my-5 text-4xl">Este caminho não está disponível.</h1><Link className="underline" href="/home">Voltar ao início</Link></main>; }

@@ -1,0 +1,3 @@
+"use client";
+import { Button } from "@/components/ui/button";
+export default function ErrorPage({ reset }: { reset: () => void }) { return <div role="alert"><h1 className="display-heading text-3xl">Não foi possível carregar esta página.</h1><p className="my-5 text-muted-foreground">Tente novamente. Se o problema continuar, contate a equipe técnica.</p><Button onClick={reset}>Tentar novamente</Button></div>; }

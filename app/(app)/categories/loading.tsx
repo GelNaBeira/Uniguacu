@@ -1,0 +1,1 @@
+export default function LoadingCategories() { return <p role="status" className="text-muted-foreground">Carregando categorias…</p>; }
