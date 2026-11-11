@@ -32,6 +32,15 @@ test("matriz ADMIN, USER básico e exclusão com flag", () => {
   assert.deepEqual(catalogPermissions(user), { canRead: true, canManage: true, canDelete: false });
   assert.equal(catalogPermissions({ ...user, limited_access: { ...user.limited_access as object, can_delete: true } }).canDelete, true);
 });
+
+test("ADMIN ativo independe das flags USER e pode criar com perfil recém-carregado", async () => {
+  for (const limited_access of [null, {}, { version: 2 }, { version: 1, can_manage_catalogs: false }]) {
+    const f = fixture();
+    const result = await executeCategoryCommand({ ...admin, limited_access }, f.repository, { type: "create", values: { name: "Admin atual" } });
+    assert.equal(result.success, true);
+    assert.deepEqual(f.calls, [["create", "Admin atual"]]);
+  }
+});
 test("flags inválidas, versão desconhecida e inativo falham fechado", () => {
   for (const limited_access of [null, {}, [], { version: 2, can_read_inventory: true },
     { version: 1, can_read_inventory: "true" }, { version: 1, can_read_inventory: true, unknown: true }]) {

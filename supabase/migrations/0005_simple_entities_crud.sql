@@ -1,5 +1,8 @@
 -- Marco 2: sectors, suppliers, collaborators e academics. Revisar em ambiente isolado.
 -- Pré-requisito: migrations 0001–0004 instaladas. Não reaplicar baseline.
+-- Executar o arquivo INTEIRO, incluindo os blocos DO e o COMMIT.
+-- O loop cria quatro policies por tabela (16 no total), não apenas SELECT.
+-- Não reaplicar sobre entidades já homologadas/policies manuais sem reconciliação.
 begin;
 
 do $$
@@ -48,5 +51,25 @@ begin
 end; $$;
 
 -- Preservados: UUIDs, UNIQUE de sectors.name, FKs NO ACTION, created_at do servidor.
+do $$
+declare t text; operation text;
+begin
+  foreach t in array array['sectors','suppliers','collaborators','academics'] loop
+    foreach operation in array array['select','insert','update','delete'] loop
+      if not exists (
+        select 1 from pg_policies p
+        where p.schemaname = 'public' and p.tablename = t
+          and p.policyname = t || '_' || operation
+          and p.cmd = upper(operation) and p.permissive = 'PERMISSIVE'
+          and p.roles = array['authenticated']::name[]
+          and (operation not in ('select','update','delete') or p.qual is not null)
+          and (operation not in ('insert','update') or p.with_check is not null)
+      ) then
+        raise exception '0005 incompleta: policy %_% ausente ou incompatível.', t, operation;
+      end if;
+    end loop;
+  end loop;
+end; $$;
+
 -- Sem UNIQUE novo em CPF/CNPJ, identificação ou RA; sem vínculos novos em academics.
 commit;
