@@ -1,0 +1,1 @@
+export { ProductNewPage as default } from "@/components/products/product-pages";

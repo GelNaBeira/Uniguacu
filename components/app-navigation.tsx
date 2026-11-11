@@ -8,7 +8,8 @@ const links = [
   { href: "/suppliers", label: "Fornecedores", number: "04", newTitle: "Novo fornecedor", editTitle: "Editar fornecedor" },
   { href: "/collaborators", label: "Colaboradores", number: "05", newTitle: "Novo colaborador", editTitle: "Editar colaborador" },
   { href: "/academics", label: "Acadêmicos", number: "06", newTitle: "Novo acadêmico", editTitle: "Editar acadêmico" },
-  { href: "/product-codes", label: "Códigos de produtos", number: "07", newTitle: "", editTitle: "" },
+  { href: "/products", label: "Produtos", number: "07", newTitle: "Novo produto", editTitle: "Editar produto" },
+  { href: "/product-codes", label: "Códigos de produtos", number: "08", newTitle: "", editTitle: "" },
 ];
 export function AppNavigation() {
   const path = usePathname();

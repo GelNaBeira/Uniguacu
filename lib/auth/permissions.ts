@@ -22,3 +22,10 @@ export function catalogPermissions(profile: PermissionProfile) {
   const canManage = admin || (canRead && hasPermission(profile, "can_manage_catalogs"));
   return { canRead, canManage, canDelete: admin || (canManage && hasPermission(profile, "can_delete")) };
 }
+
+export function productPermissions(profile: PermissionProfile) {
+  const admin = profile.is_active && profile.role === "ADMIN";
+  const canRead = admin || hasPermission(profile, "can_read_inventory");
+  const canManage = admin || (canRead && hasPermission(profile, "can_manage_products"));
+  return { canRead, canManage, canDelete: admin || (canManage && hasPermission(profile, "can_delete")) };
+}

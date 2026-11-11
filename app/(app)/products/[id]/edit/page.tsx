@@ -1,0 +1,1 @@
+export { ProductEditPage as default } from "@/components/products/product-pages";

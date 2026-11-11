@@ -4,6 +4,7 @@ import { catalogPermissions, type PermissionProfile } from "../lib/auth/permissi
 import { categorySchema, categoryIdSchema, categoryError } from "../lib/categories/schema.ts";
 import { executeCategoryCommand, type CategoryRepository } from "../lib/categories/service.ts";
 import { parseCategoryQuery, pageRange, categoryListUrl, escapeLike } from "../lib/categories/pagination.ts";
+import { categorySavedUrl, submitCategory } from "../lib/categories/submission.ts";
 
 const id = "20000000-0000-4000-8000-000000000001";
 const admin: PermissionProfile = { role: "ADMIN", is_active: true, limited_access: {} };
@@ -91,4 +92,52 @@ test("paginação é limitada por página e parâmetros são seguros", () => {
   assert.deepEqual(pageRange(2), { from: 10, to: 19 });
   assert.equal(new URL(categoryListUrl(2, "A&B"), "http://localhost").searchParams.get("q"), "A&B");
   assert.equal(escapeLike("100%_\\"), "100\\%\\_\\\\");
+});
+
+test("INSERT com erro RLS não é sucesso e mensagem chega ao formulário sem limpar ou navegar", async () => {
+  const f = fixture("42501");
+  const events: string[] = [];
+  await submitCategory({ name: "Emprestavel" }, false, {
+    save: (values) => executeCategoryCommand(admin, f.repository, { type: "create", values }),
+    showError: (message) => events.push(message),
+    reset: () => events.push("reset"), navigate: () => events.push("navigate"),
+  });
+  assert.deepEqual(events, [categoryError("42501")]);
+  assert.deepEqual(f.calls, [["create", "Emprestavel"]]);
+});
+
+test("INSERT sem linha confirmada ou com erro sem código não limpa nem redireciona", async () => {
+  for (const dbResult of [{ id: null }, { id, failed: true }]) {
+    const events: string[] = [];
+    const f = fixture(); f.repository.create = async () => dbResult;
+    await submitCategory({ name: "Emprestavel" }, false, {
+      save: (values) => executeCategoryCommand(admin, f.repository, { type: "create", values }),
+      showError: (message) => events.push(message), reset: () => events.push("reset"), navigate: () => events.push("navigate"),
+    });
+    assert.equal(events.length, 1); assert.notEqual(events[0], "reset"); assert.notEqual(events[0], "navigate");
+  }
+});
+
+test("cadastro confirmado limpa e navega para página 1 buscando a categoria salva", async () => {
+  const f = fixture(); const events: string[] = [];
+  await submitCategory({ name: "Emprestavel" }, false, {
+    save: (values) => executeCategoryCommand(admin, f.repository, { type: "create", values }),
+    showError: (message) => events.push(message), reset: () => events.push("reset"), navigate: (url) => events.push(url),
+  });
+  assert.deepEqual(events, ["reset", "/categories?page=1&q=Emprestavel&status=created"]);
+});
+
+test("destino pós-edição preserva nome com acentos e caracteres de query sem injeção", () => {
+  const url = new URL(categorySavedUrl("  A&B / Empréstimo  ", true), "http://localhost");
+  assert.equal(url.pathname, "/categories"); assert.equal(url.searchParams.get("q"), "A&B / Empréstimo");
+  assert.equal(url.searchParams.get("page"), "1"); assert.equal(url.searchParams.get("status"), "updated");
+});
+
+test("falha de transporte no envio é exibida e preserva os campos", async () => {
+  const events: string[] = [];
+  await submitCategory({ name: "Emprestavel" }, false, {
+    save: async () => { throw new Error("detalhe interno"); },
+    showError: (message) => events.push(message), reset: () => events.push("reset"), navigate: () => events.push("navigate"),
+  });
+  assert.equal(events.length, 1); assert.match(events[0], /Não foi possível confirmar/); assert.doesNotMatch(events[0], /detalhe interno/);
 });
