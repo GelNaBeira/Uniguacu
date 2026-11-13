@@ -1,6 +1,9 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem, useSidebar } from "@/components/ui/sidebar";
+import { canViewAdministration, isNavigationActive, navigationGroups } from "@/lib/navigation";
 const links = [
   { href: "/home", label: "Início", number: "01", newTitle: "", editTitle: "" },
   { href: "/categories", label: "Categorias", number: "02", newTitle: "Nova categoria", editTitle: "Editar categoria" },
@@ -13,9 +16,31 @@ const links = [
   { href: "/keys", label: "Chaves", number: "09", newTitle: "Nova chave", editTitle: "Editar chave" },
   { href: "/cars", label: "Carros", number: "10", newTitle: "Novo carro", editTitle: "Editar carro" },
 ];
-export function AppNavigation() {
+export function AppNavigation({ role }: { role: "ADMIN" | "USER" }) {
   const path = usePathname();
-  return <nav aria-label="Navegação principal" className="space-y-2">{links.map((link) => { const active = path === link.href || path.startsWith(`${link.href}/`); return <Link key={link.href} href={link.href} aria-current={active ? "page" : undefined} className={`flex items-center gap-3 rounded-md px-4 py-3 text-sm ${active ? "bg-white/10 text-white" : "text-white/65 hover:bg-white/5 hover:text-white"}`}><span className="font-mono text-xs text-[#d4bd81]">{link.number}</span>{link.label}</Link>; })}</nav>;
+  const { setOpenMobile } = useSidebar();
+  return <Sidebar>
+    <SidebarHeader><p className="text-xs tracking-[.2em] text-[#d4bd81]">UNIGUAÇU</p><p className="display-heading mt-2 text-3xl">Almoxarifado.</p><p className="mt-2 text-xs text-white/55">Foz do Iguaçu</p></SidebarHeader>
+    <SidebarContent><nav aria-label="Navegação principal"><SidebarMenu>
+      <SidebarMenuItem><SidebarMenuButton asChild isActive={path === "/home"}><Link href="/home" aria-current={path === "/home" ? "page" : undefined} onClick={() => setOpenMobile(false)}><span className="font-mono text-xs text-[#d4bd81]">01</span>Início</Link></SidebarMenuButton></SidebarMenuItem>
+      {navigationGroups.map((group) => {
+        const active = group.items.some((item) => isNavigationActive(path, item.href));
+        return <Collapsible key={`${group.label}-${path}`} asChild defaultOpen={active} className="group/collapsible">
+          <SidebarMenuItem><CollapsibleTrigger asChild><SidebarMenuButton isActive={active}><span className="font-mono text-xs text-[#d4bd81]">{group.number}</span>{group.label}<span aria-hidden="true" className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180">⌄</span></SidebarMenuButton></CollapsibleTrigger>
+            <CollapsibleContent><SidebarMenuSub>{group.items.map((item) => {
+              const itemActive = isNavigationActive(path, item.href);
+              return <SidebarMenuSubItem key={item.href}><SidebarMenuSubButton asChild isActive={itemActive}><Link href={item.href} aria-current={itemActive ? "page" : undefined} onClick={() => setOpenMobile(false)}>{item.label}</Link></SidebarMenuSubButton></SidebarMenuSubItem>;
+            })}</SidebarMenuSub></CollapsibleContent>
+          </SidebarMenuItem>
+        </Collapsible>;
+      })}
+      {canViewAdministration(role) && <Collapsible asChild className="group/collapsible"><SidebarMenuItem>
+        <CollapsibleTrigger asChild><SidebarMenuButton><span className="font-mono text-xs text-[#d4bd81]">05</span>Administração<span aria-hidden="true" className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180">⌄</span></SidebarMenuButton></CollapsibleTrigger>
+        <CollapsibleContent><SidebarMenuSub><SidebarMenuSubItem><span aria-disabled="true" className="flex min-h-10 items-center justify-between gap-2 px-3 py-2 text-sm text-white/45">Usuários<span className="rounded border border-white/15 px-1.5 py-0.5 text-[10px]">Em breve</span></span></SidebarMenuSubItem></SidebarMenuSub></CollapsibleContent>
+      </SidebarMenuItem></Collapsible>}
+    </SidebarMenu></nav></SidebarContent>
+    <SidebarFooter><p className="text-xs leading-6 text-white/55">Gestão de materiais<br />e recursos institucionais.</p></SidebarFooter>
+  </Sidebar>;
 }
 export function Breadcrumb() {
   const path = usePathname();
