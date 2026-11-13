@@ -1,6 +1,6 @@
 # Plano de Implementação — Almoxarifado Uniguacu
 
-**Estado em 13/11/2026:** Fase 3 / início do Marco 5 (preparação). Marcos 1 a 4 concluídos na implementação e commitados; homologação final do Marco 4 e aplicação das migrations 0007/0008 pelo cliente ainda pendentes de confirmação. A implementação dos fluxos do Marco 5 aguarda o “ok” oficial após esses testes.
+**Estado em 13/11/2026:** Fase 3 / Marco 5 autorizado, dividido em backend e interface. Marcos 1–4 concluídos e commitados; cliente confirmou 0007/0008 aplicadas e Marco 4 oficialmente homologado. Etapa 1: 0009 aplicada no Supabase de desenvolvimento via MCP, registrada como `20261113125615_0009_lending_rpcs`; lend_product validada com produto existente (estoque 1 → 0 → 1) e seis RPCs/autorização testadas em transações com rollback. Concorrência entre conexões, falha injetada no histórico e gateway HTTP/JWT ainda pendentes; etapa 2 (/home) ainda não iniciada. Contratos e evidências em `C:\Projetos\Uniguacu\docs\MARCO-5-BACKEND.md`.
 **Raiz de referência:** `C:\Projetos\Uniguacu\`.  
 **Contrato:** `C:\Projetos\Uniguacu\docs\PDD.md`; fonte funcional exclusiva: `C:\Projetos\Uniguacu\docs\MAPA-FUNCIONAL.md`. SQL local de baseline: `C:\Projetos\Uniguacu\supabase\migrations\0001_initial_schema.sql`.
 
@@ -11,8 +11,8 @@
 | 1 — Setup, autenticação e layout | Concluído; homologação registrada no documento do Marco 2 | `2477896`, 11/11/2026 |
 | 2 — Cadastros básicos | Concluído; homologação registrada no documento do Marco 3 | `2477896`, 11/11/2026 |
 | 3 — Produtos | Concluído no escopo MVP aprovado; integração real banco/Storage depende das evidências de homologação | `08258a0`, 11/11/2026 |
-| 4 — Chaves e carros | Concluído; homologação ADMIN/USER e SQL/RLS ainda pendente de confirmação. Correção complementar de distance na 0008 | `9850249` e sidebar `00836db`, 12/11/2026 |
-| 5 — Empréstimos e devoluções | Em preparação; implementação não iniciada, aguardando aceite do Marco 4 | Sem commit de implementação |
+| 4 — Chaves e carros | Oficialmente homologado pelo cliente em 13/11/2026; 0007/0008 aplicadas e CRUD validado no navegador | `9850249`, `00836db` e correção `78ac253` |
+| 5 — Empréstimos e devoluções | Backend 0009 aplicado e seis RPCs testadas no Supabase de desenvolvimento; concorrência/HTTP e interface pendentes | Alterações locais desta etapa ainda sem commit |
 | 6 — Histórico/admin/perfil/ajuda e relatórios | Planejado; não implementado | Sem commit de implementação |
 
 Registros detalhados: `C:\Projetos\Uniguacu\docs\MARCO-1.md`, `C:\Projetos\Uniguacu\docs\MARCO-2-CATEGORIES.md`, `C:\Projetos\Uniguacu\docs\MARCO-2-ENTIDADES-SIMPLES.md`, `C:\Projetos\Uniguacu\docs\MARCO-3-PRODUTOS.md` e `C:\Projetos\Uniguacu\docs\MARCO-4-CHAVES-E-CARROS.md`. Conclusão de código não substitui os gates de banco, segurança e aceite operacional abaixo.
@@ -29,7 +29,7 @@ Registros detalhados: `C:\Projetos\Uniguacu\docs\MARCO-1.md`, `C:\Projetos\Unigu
 4. PostgreSQL 17+ altera a expressão preservando a coluna. Em versões anteriores, a coluna gerada é recriada sem CASCADE e passa ao final da tabela; dependências ou grants/comentários/NOT NULL customizados fazem o preflight abortar para revisão, sem remoção silenciosa. Não há inventário remoto presumido. Referência técnica: documentação oficial PostgreSQL 17, seção ALTER TABLE / SET EXPRESSION AS, e PostgreSQL 16, seção ALTER TABLE.
 5. A correção obtém lock exclusivo e pode recalcular a tabela; executar em janela sem uso concorrente. Espera pelo lock limitada a cinco segundos. Falha aborta a transação: executar ROLLBACK na sessão, investigar e só depois repetir. Antes do COMMIT, ROLLBACK preserva a expressão anterior; depois do sucesso, eventual reversão exige migration revisada, não reset ou restauração destrutiva automática.
 6. Em Supabase **isolado**, validar `C:\Projetos\Uniguacu\supabase\tests\distance.sql` via psql: NULL/NULL, cada odômetro ausente, diferença positiva, zero e legado negativo. O teste usa a expressão real instalada e ROLLBACK; não executar em produção. A execução SQL real ainda depende de ambiente PostgreSQL disponível; regressões Node são apenas textuais.
-7. Homologar as telas de chaves/carros com ADMIN/USER e registrar o “ok” oficial antes das RPCs do Marco 5. Nenhum banco remoto foi alterado pelo agente nestes ajustes.
+7. **Gate concluído conforme confirmação do cliente em 13/11/2026:** 0007/0008 aplicadas, CRUD validado no navegador, Marco 4 homologado e Marco 5 autorizado. Nenhum banco remoto foi alterado pelo agente.
 
 ## 1. Regras de execução
 
@@ -288,7 +288,7 @@ M2; decidir D02, D07 e D11 para aceite integral. A geração/leitura de código 
 
 ## 8. Marco 5 — RPCs de empréstimo e devolução
 
-**Situação atual:** preparação autorizada dos pré-requisitos, sem implementação das RPCs ou telas operacionais. Aguardar aplicação/homologação de 0007/0008 e “ok” oficial do cliente. D02 permanece estoque agregado, sem códigos individuais; devolução integral conforme D03. Confirmar as demais decisões de fluxo antes de codificar.
+**Situação atual:** início autorizado após homologação do Marco 4. Etapa 1 entrega as seis RPCs e bloqueios DML na 0009, com teste SQL e runner concorrente ainda não executados por instalação PostgreSQL incompleta. Etapa 2 (/home) não iniciada. D02 mantém estoque agregado; D03 devolução integral. Cliente aprovou colaborador obrigatório nos novos empréstimos, datas efetivas do servidor separadas do legado e UUID de idempotência por operador. Contratos completos em `C:\Projetos\Uniguacu\docs\MARCO-5-BACKEND.md`.
 
 ### Pré-requisitos
 
@@ -381,4 +381,4 @@ Antes de release produtivo: autorização específica, revisão do diff/migratio
 | G3 — MVP | M6-A e regressão operacional completos | Núcleo apto a homologação/release autorizado. |
 | G4 — relatórios | D10, M6-B e autorização de exportação verificados | Evolução funcional entregue. |
 
-**Situação atual:** Marcos 1–4 implementados e commitados, sidebar responsiva entregue e Marco 5 em preparação. A 0008 complementa a correção de distância do Marco 4 e aguarda aplicação manual junto à homologação da 0007. Nenhuma execução remota, instalação de dependência ou deploy foi realizado nestes ajustes. O “ok” oficial do cliente após homologação continua sendo o gate para iniciar os fluxos do Marco 5.
+**Situação atual:** Marcos 1–4 concluídos; Marco 4 homologado com 0007/0008 aplicadas pelo cliente. Marco 5 iniciado somente no backend (0009), sem interface; execução SQL real e homologação das RPCs pendentes. Nenhuma execução remota, instalação de dependência ou deploy pelo agente nesta etapa. Marco 5 não deve ser declarado concluído antes dos testes reais de banco/concorrência e da etapa 2.
