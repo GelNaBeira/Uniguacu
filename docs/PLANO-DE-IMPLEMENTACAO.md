@@ -1,8 +1,35 @@
 # Plano de Implementação — Almoxarifado Uniguacu
 
-**Estado:** Fase 3 / Marco 1 autorizado em 11/11/2026. Registro de execução e gates ainda pendentes em `C:\Projetos\Uniguacu\docs\MARCO-1.md`. O restante deste documento preserva o plano e suas condições de aceite.  
+**Estado em 13/11/2026:** Fase 3 / início do Marco 5 (preparação). Marcos 1 a 4 concluídos na implementação e commitados; homologação final do Marco 4 e aplicação das migrations 0007/0008 pelo cliente ainda pendentes de confirmação. A implementação dos fluxos do Marco 5 aguarda o “ok” oficial após esses testes.
 **Raiz de referência:** `C:\Projetos\Uniguacu\`.  
 **Contrato:** `C:\Projetos\Uniguacu\docs\PDD.md`; fonte funcional exclusiva: `C:\Projetos\Uniguacu\docs\MAPA-FUNCIONAL.md`. SQL local de baseline: `C:\Projetos\Uniguacu\supabase\migrations\0001_initial_schema.sql`.
+
+## Status consolidado e decisões vigentes
+
+| Marco | Status da implementação | Evidência no Git |
+|---|---|---|
+| 1 — Setup, autenticação e layout | Concluído; homologação registrada no documento do Marco 2 | `2477896`, 11/11/2026 |
+| 2 — Cadastros básicos | Concluído; homologação registrada no documento do Marco 3 | `2477896`, 11/11/2026 |
+| 3 — Produtos | Concluído no escopo MVP aprovado; integração real banco/Storage depende das evidências de homologação | `08258a0`, 11/11/2026 |
+| 4 — Chaves e carros | Concluído; homologação ADMIN/USER e SQL/RLS ainda pendente de confirmação. Correção complementar de distance na 0008 | `9850249` e sidebar `00836db`, 12/11/2026 |
+| 5 — Empréstimos e devoluções | Em preparação; implementação não iniciada, aguardando aceite do Marco 4 | Sem commit de implementação |
+| 6 — Histórico/admin/perfil/ajuda e relatórios | Planejado; não implementado | Sem commit de implementação |
+
+Registros detalhados: `C:\Projetos\Uniguacu\docs\MARCO-1.md`, `C:\Projetos\Uniguacu\docs\MARCO-2-CATEGORIES.md`, `C:\Projetos\Uniguacu\docs\MARCO-2-ENTIDADES-SIMPLES.md`, `C:\Projetos\Uniguacu\docs\MARCO-3-PRODUTOS.md` e `C:\Projetos\Uniguacu\docs\MARCO-4-CHAVES-E-CARROS.md`. Conclusão de código não substitui os gates de banco, segurança e aceite operacional abaixo.
+
+**D02 — Barcode/MVP mantido e reconfirmado em 13/11/2026:** estoque por `products.qtd`, sem rastreamento de códigos individuais ou por exemplar. `has_barcode` e `bar_code` continuam campos manuais opcionais do produto; sem geração/leitura automatizada, tabela de exemplares ou bibliotecas novas. `C:\Projetos\Uniguacu\app\(app)\product-codes\page.tsx` permanece como funcionalidade em desenvolvimento. As propostas históricas de códigos individuais abaixo não integram o aceite do MVP.
+
+**Ajustes de escopo já aprovados:** quantidade inicial permitida no INSERT de produto, sem UPDATE direto de estoque; movimentações e histórico transacional pertencem ao Marco 5. A revisão da expressão de distância prevista em M4.4 é entregue separadamente na 0008; validações de devolução e odômetro permanecem no Marco 5.
+
+### Aplicação manual da correção de distância
+
+1. Confirmar backup, ambiente de homologação e migrations 0001–0006 instaladas. Aplicar primeiro `C:\Projetos\Uniguacu\supabase\migrations\0007_keys_cars_crud.sql` conforme o roteiro do Marco 4.
+2. Aplicar **inteiro**, como postgres, `C:\Projetos\Uniguacu\supabase\migrations\0008_fix_distance.sql`, de BEGIN a COMMIT. **Não executar 0006a nem reaplicar a baseline.**
+3. A 0008 usa `CASE WHEN km_in IS NULL OR km_out IS NULL THEN NULL ELSE km_in - km_out END`. Corrige a distância armazenada sem alterar odômetros, UUIDs, status, FKs ou RLS. Não saneia dados legados: com ambos os odômetros preenchidos e entrada menor que saída, a diferença continua negativa; a rejeição de devoluções inválidas será implementada no Marco 5.
+4. PostgreSQL 17+ altera a expressão preservando a coluna. Em versões anteriores, a coluna gerada é recriada sem CASCADE e passa ao final da tabela; dependências ou grants/comentários/NOT NULL customizados fazem o preflight abortar para revisão, sem remoção silenciosa. Não há inventário remoto presumido. Referência técnica: documentação oficial PostgreSQL 17, seção ALTER TABLE / SET EXPRESSION AS, e PostgreSQL 16, seção ALTER TABLE.
+5. A correção obtém lock exclusivo e pode recalcular a tabela; executar em janela sem uso concorrente. Espera pelo lock limitada a cinco segundos. Falha aborta a transação: executar ROLLBACK na sessão, investigar e só depois repetir. Antes do COMMIT, ROLLBACK preserva a expressão anterior; depois do sucesso, eventual reversão exige migration revisada, não reset ou restauração destrutiva automática.
+6. Em Supabase **isolado**, validar `C:\Projetos\Uniguacu\supabase\tests\distance.sql` via psql: NULL/NULL, cada odômetro ausente, diferença positiva, zero e legado negativo. O teste usa a expressão real instalada e ROLLBACK; não executar em produção. A execução SQL real ainda depende de ambiente PostgreSQL disponível; regressões Node são apenas textuais.
+7. Homologar as telas de chaves/carros com ADMIN/USER e registrar o “ok” oficial antes das RPCs do Marco 5. Nenhum banco remoto foi alterado pelo agente nestes ajustes.
 
 ## 1. Regras de execução
 
@@ -14,11 +41,11 @@
 6. Usar o JWT do usuário nos dados de negócio. Cliente privilegiado server-only exclusivamente nas operações de Auth que o exigem. Gate ADMIN no banco e no BFF; não acreditar em papel enviado pelo cliente.
 7. Os SQLs no PDD são design. Produzir migrations completas, tipadas e verificadas somente na Fase 3. Nenhuma tabela nova de códigos será criada sem decisão D02.
 
-**Estado do workspace verificado:** contém captura Angular estática, docs e SQL; a raiz não é reconhecida como repositório Git. Não substituir `index.html`/bundles/assets nem inicializar/publicar repositório automaticamente. Na Fase 3, confirmar checkout e branch de `GelNaBeira/Uniguacu`, inventariar arquivos e preservar material legado separado antes do scaffold. Não executar `create-next-app` sobre a pasta ocupada sem estratégia de preservação.
+**Estado do workspace verificado em 13/11/2026:** repositório Git na branch `main`, implementação Next.js em `app/`, componentes em `components/` e serviços em `lib/`, além de docs e migrations. Sidebar responsiva com submenus entregue. Captura Angular estática preservada: não substituir `index.html`/bundles/assets nem executar scaffold sobre a raiz ocupada. Referências a `origin/main` são locais e não comprovam deploy ou estado remoto atual.
 
 ## 2. Estrutura-alvo completa
 
-Todos os caminhos da árvore são relativos à raiz absoluta acima. Representam arquivos futuros, não implementados. Nomes de módulos internos são proposta organizacional; não são funcionalidades adicionais. Os destinos de todas as 33 rotas constam do PDD.
+Todos os caminhos da árvore são relativos à raiz absoluta acima. A árvore preserva a estrutura-alvo do planejamento, não um inventário atualizado: partes dos Marcos 1–4 já existem e módulos dos Marcos 5–6 permanecem futuros. Nomes de módulos internos são proposta organizacional; não são funcionalidades adicionais. Os destinos de todas as 33 rotas constam do PDD.
 
 ```text
 C:\Projetos\Uniguacu\
@@ -261,6 +288,8 @@ M2; decidir D02, D07 e D11 para aceite integral. A geração/leitura de código 
 
 ## 8. Marco 5 — RPCs de empréstimo e devolução
 
+**Situação atual:** preparação autorizada dos pré-requisitos, sem implementação das RPCs ou telas operacionais. Aguardar aplicação/homologação de 0007/0008 e “ok” oficial do cliente. D02 permanece estoque agregado, sem códigos individuais; devolução integral conforme D03. Confirmar as demais decisões de fluxo antes de codificar.
+
 ### Pré-requisitos
 
 M2–M4, matriz aprovada e D03–D06/D12/D13 resolvidos para os fluxos correspondentes. Definir se empréstimo permite acadêmico, parcial/faltantes, sem devolução, datas/fuso e códigos. Desconhecidos permanecem bloqueados explicitamente; não avançar o aceite de um fluxo sem contrato.
@@ -336,7 +365,7 @@ Um marco só está concluído quando:
 
 ## 11. Validação e operação planejadas
 
-Na Fase 3, scripts a definir no package.json: `lint`, `typecheck`, `build`, `test`, `test:e2e` e comando de integração SQL compatível com o ambiente aprovado. Não alegar que esses comandos existem hoje. CI sem credencial de produção; testes de Auth/Storage somente com fixtures e limpeza restrita ao ambiente de teste.
+Scripts existentes em `C:\Projetos\Uniguacu\package.json`: `lint`, `typecheck`, `build` e `test` (Node nativo). `test:e2e` e comando de integração SQL ainda não estão configurados como scripts npm. Testes SQL em `C:\Projetos\Uniguacu\supabase\tests\` exigem ambiente isolado e não são comprovados pelos testes com mocks/inspeção textual. CI sem credencial de produção; testes de Auth/Storage somente com fixtures e limpeza restrita ao ambiente de teste.
 
 Para banco, testar baseline + refinamentos tanto em ambiente limpo de teste quanto em cópia sanitizada com dados/constraints existentes. Não usar `db reset` no projeto hospedado. Concorrência precisa de pelo menos duas conexões reais. Falha injetada não vai para produção.
 
@@ -352,4 +381,4 @@ Antes de release produtivo: autorização específica, revisão do diff/migratio
 | G3 — MVP | M6-A e regressão operacional completos | Núcleo apto a homologação/release autorizado. |
 | G4 — relatórios | D10, M6-B e autorização de exportação verificados | Evolução funcional entregue. |
 
-**Situação desta entrega:** apenas documentação criada. Nenhum código Next.js, política aplicada, RPC executada, dependência instalada, deploy realizado ou banco modificado. Aguardar o “ok” do cliente antes de iniciar Fase 3.
+**Situação atual:** Marcos 1–4 implementados e commitados, sidebar responsiva entregue e Marco 5 em preparação. A 0008 complementa a correção de distância do Marco 4 e aguarda aplicação manual junto à homologação da 0007. Nenhuma execução remota, instalação de dependência ou deploy foi realizado nestes ajustes. O “ok” oficial do cliente após homologação continua sendo o gate para iniciar os fluxos do Marco 5.
