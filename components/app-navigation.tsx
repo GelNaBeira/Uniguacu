@@ -10,6 +10,8 @@ const links = [
   { href: "/academics", label: "Acadêmicos", number: "06", newTitle: "Novo acadêmico", editTitle: "Editar acadêmico" },
   { href: "/products", label: "Produtos", number: "07", newTitle: "Novo produto", editTitle: "Editar produto" },
   { href: "/product-codes", label: "Códigos de produtos", number: "08", newTitle: "", editTitle: "" },
+  { href: "/keys", label: "Chaves", number: "09", newTitle: "Nova chave", editTitle: "Editar chave" },
+  { href: "/cars", label: "Carros", number: "10", newTitle: "Novo carro", editTitle: "Editar carro" },
 ];
 export function AppNavigation() {
   const path = usePathname();

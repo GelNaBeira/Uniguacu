@@ -29,3 +29,10 @@ export function productPermissions(profile: PermissionProfile) {
   const canManage = admin || (canRead && hasPermission(profile, "can_manage_products"));
   return { canRead, canManage, canDelete: admin || (canManage && hasPermission(profile, "can_delete")) };
 }
+
+export function resourcePermissions(profile: PermissionProfile, entity: "keys" | "cars") {
+  const admin = profile.is_active && profile.role === "ADMIN";
+  const canRead = admin || hasPermission(profile, "can_read_inventory");
+  const canManage = admin || (canRead && hasPermission(profile, entity === "keys" ? "can_manage_keys" : "can_manage_cars"));
+  return { canRead, canManage, canDelete: admin || (canManage && hasPermission(profile, "can_delete")), canCorrectMileage: admin && entity === "cars" };
+}
