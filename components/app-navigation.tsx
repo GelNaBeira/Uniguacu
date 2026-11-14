@@ -12,7 +12,7 @@ const mainLinks = [
   { href: "/collaborators", label: "Colaboradores", icon: "♙" },
   { href: "/academics", label: "Acadêmicos", icon: "◇" },
 ];
-export function AppNavigation({ name, role }: { name: string; role: "ADMIN" | "USER" }) {
+export function AppNavigation({ name, role, photo }: { name: string; role: "ADMIN" | "USER"; photo?: string | null }) {
   const path = usePathname();
   return <header className="border-b border-border bg-card shadow-sm">
     <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-4 px-4 py-3 lg:px-8">
@@ -21,12 +21,14 @@ export function AppNavigation({ name, role }: { name: string; role: "ADMIN" | "U
         {mainLinks.map((link) => <Link key={link.href} href={link.href} aria-current={isNavigationActive(path, link.href) ? "page" : undefined} className={`flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-semibold transition-colors ${isNavigationActive(path, link.href) ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><span aria-hidden="true" className="text-lg">{link.icon}</span>{link.label}</Link>)}
         <details className="relative"><summary className="cursor-pointer rounded-md px-3 py-3 text-sm font-semibold text-muted-foreground">Cadastros</summary><div className="absolute right-0 top-full z-30 mt-2 w-52 rounded-lg border border-border bg-card p-2 shadow-xl">{[{ href: "/cars", label: "Carros" }, { href: "/categories", label: "Categorias" }, { href: "/sectors", label: "Setores" }, { href: "/suppliers", label: "Fornecedores" }, { href: "/product-codes", label: "Códigos de produtos" }].map((link) => <Link key={link.href} href={link.href} className="block rounded px-3 py-2 text-sm hover:bg-muted">{link.label}</Link>)}</div></details>
       </nav>
-      <details className="relative"><summary aria-label={`Menu de ${name}`} className="flex cursor-pointer list-none items-center gap-3 rounded-lg p-2 hover:bg-muted"><span aria-hidden="true" className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">{name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("")}</span><span className="max-w-28 truncate text-sm font-semibold sm:max-w-40">{name}</span><span aria-hidden="true">⌄</span></summary><div className="absolute right-0 z-40 mt-2 w-64 rounded-lg border border-border bg-card p-3 shadow-xl"><p className="border-b border-border px-2 pb-3 text-xs text-muted-foreground">{role === "ADMIN" ? "Administrador" : "Usuário"}</p><Link href="/profile" className="mt-1 block rounded px-2 py-2 text-sm hover:bg-muted">Perfil</Link><Link href="/help" className="block rounded px-2 py-2 text-sm hover:bg-muted">Ajuda</Link><form action={logout}><button className="mt-1 w-full rounded px-2 py-2 text-left text-sm font-semibold text-red-800 hover:bg-red-50">Sair</button></form></div></details>
+      <details className="relative"><summary aria-label={`Menu de ${name}`} className="flex cursor-pointer list-none items-center gap-3 rounded-lg p-2 hover:bg-muted"><span aria-hidden="true" className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">{photo ? <Image src={photo} alt="" width={40} height={40} unoptimized className="h-10 w-10 rounded-full object-cover" /> : name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("")}</span><span className="max-w-28 truncate text-sm font-semibold sm:max-w-40">{name}</span><span aria-hidden="true">⌄</span></summary><div className="absolute right-0 z-40 mt-2 w-64 rounded-lg border border-border bg-card p-3 shadow-xl"><p className="border-b border-border px-2 pb-3 text-xs text-muted-foreground">{role === "ADMIN" ? "Administrador" : "Usuário"}</p><Link href="/perfil" className="mt-1 block rounded px-2 py-2 text-sm hover:bg-muted">Perfil</Link>{role === "ADMIN" && <Link href="/admin" className="block rounded px-2 py-2 text-sm hover:bg-muted">Painel Admin</Link>}<Link href="/help" className="block rounded px-2 py-2 text-sm hover:bg-muted">Ajuda</Link><form action={logout}><button className="mt-1 w-full rounded px-2 py-2 text-left text-sm font-semibold text-red-800 hover:bg-red-50">Sair</button></form></div></details>
     </div>
   </header>;
 }
 const links = [
-  { href: "/profile", label: "Meu perfil", number: "", newTitle: "", editTitle: "" },
+  { href: "/admin/users", label: "Usuários", number: "", newTitle: "", editTitle: "" },
+  { href: "/admin", label: "Painel Admin", number: "", newTitle: "", editTitle: "" },
+  { href: "/perfil", label: "Meu perfil", number: "", newTitle: "", editTitle: "" },
   { href: "/help", label: "Ajuda", number: "", newTitle: "", editTitle: "" },
   { href: "/home", label: "Início", number: "01", newTitle: "", editTitle: "" },
   { href: "/categories", label: "Categorias", number: "02", newTitle: "Nova categoria", editTitle: "Editar categoria" },
