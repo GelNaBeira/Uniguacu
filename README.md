@@ -1,40 +1,117 @@
-# Almoxarifado Uniguaçu — Marco 1
+# Almoxarifado Uniguaçu
 
-Raiz: `C:\Projetos\Uniguacu`. Captura Angular original preservada; não é servida pela nova aplicação.
+Next.js 16/App Router, React 19, TypeScript, Tailwind 4 e Supabase Auth/Postgres/Storage. Raiz: `C:\Projetos\Uniguacu`. Captura Angular legada preservada; não é servida pelo App Router.
 
-## Desenvolvimento
+## Instalação
 
-Node 22.18+ (validado com Node 24), npm e dependências fixadas em lockfile.
+Node 22.18+ (ou Node 24), npm e projeto Supabase isolado.
 
 ```powershell
+Set-Location C:\Projetos\Uniguacu
 npm ci
 Copy-Item .env.example .env.local
-# Preencher .env.local com configuração de projeto Supabase isolado.
+# Preencher variáveis sem versionar os valores.
 npm run dev
 ```
 
-O projeto usa Next.js 16/App Router, React 19, TypeScript, Tailwind 4/PostCSS e componentes locais no padrão shadcn/ui (`components.json`). Tailwind 4 configura o tema no CSS; não precisa de tailwind.config.ts. `proxy.ts` substitui a convenção middleware.ts do plano. Nenhuma chave privilegiada é usada pelo Marco 1.
+Primeiro ADMIN: provisionamento por TI via Auth Admin/painel e promoção controlada no banco. Não existe bootstrap público ou seed com senha. Demais usuários são geridos pelo Painel Admin; perfil próprio não pode promover papel/permissões.
 
-## Banco e Auth — não aplicar em produção
+## Banco e migrations
 
-1. Confrontar catálogo real, políticas, triggers, funções e grants (incluindo grants por coluna) com a baseline. Os SQLs antigos em supabase/tests/phase2* não representam automaticamente o contrato novo.
-2. Em banco Supabase isolado, executar migrations em ordem: 0001, 0002, 0003. Não reaplicar 0001 em banco existente. Fazer backup e ensaiar restauração antes de qualquer rollout autorizado.
-3. Desabilitar **Allow new users to sign up** no painel Supabase Auth ANTES de disponibilizar a aplicação. Não existe cadastro público na UI. A trigger cria perfil USER com flags aprovadas, ignorando role/permissões de metadata. Perfis legados não recebem permissões automaticamente.
-4. Configurar Site URL igual a APP_URL e permitir a URL exata `/auth/callback` no redirect allowlist de Auth. Recuperação usa PKCE e requer abrir o link no mesmo navegador que solicitou. O callback sempre leva a `/reset-password`; parâmetros `next`/destinos externos não são aceitos.
-5. Primeiro ADMIN: provisionamento por TI via Auth Admin/painel, depois promoção SQL em ambiente controlado. Não há endpoint de bootstrap nem seed com senha.
-6. Validar RLS como anon, USER, ADMIN e perfil inativo via API, não com service role. Consultar `supabase/tests/marco1_security.sql` para verificações estruturais locais. Não declarar segurança homologada sem testes de identidades reais.
+1. Fazer backup, ensaiar restauração e confrontar schema, triggers, funções, policies e grants com o destino.
+2. Em projeto **novo e isolado**, revisar/aplicar `C:\Projetos\Uniguacu\supabase\migrations\0001_initial_schema.sql` até `C:\Projetos\Uniguacu\supabase\migrations\0015_security_hardening.sql`, em ordem, **EXCLUINDO `C:\Projetos\Uniguacu\supabase\migrations\0006a_reset_products.sql` (destrutiva, não faz parte da instalação)**. Existem precondições e migrations não reaplicáveis: homologar a sequência antes de produção.
+3. Em projeto existente, aplicar apenas pendentes após confrontar o histórico remoto. A `0014` já está instalada no Uniguacu (`nfpptemkkgjdagcpuhfv`) como `20261114175607`; **não reaplicar**.
+4. A nova `0015_security_hardening.sql` está preparada, **não aplicada remotamente nesta auditoria**. Revoga execução pública do event trigger `rls_auto_enable` e cria quota persistente por usuário. Não apaga dados de negócio ou Storage.
+5. **Aplicar/homologar a `0015` antes desta versão**: sem a RPC da quota, relatórios e empréstimos falham fechados. Testar anon, USER autorizado, USER sem permissão, ADMIN, inativo e concorrência real.
+6. Não executar indiscriminadamente os SQLs em `C:\Projetos\Uniguacu\supabase\tests`: há contratos antigos. Revisar e rodar em projeto descartável, sem service role nos testes de RLS.
 
-Todas as escritas de domínio estão bloqueadas neste marco, inclusive para ADMIN pelo cliente. Não há RPC de empréstimo, cadastro, ajuste ou inativação ainda. Soft delete usa usuarios.is_active; helpers negam imediatamente perfis inativos. Exclusão física do perfil (inclusive cascade do Auth) está bloqueada. A futura ação do perfil será **Inativar Conta**, nunca deletar, com proteção transacional do último ADMIN antes de expor a rotina. Nenhum botão sem implementação foi adicionado.
+## Checklist de deploy — Vercel + Supabase
 
-## Validação
+### Variáveis Vercel
+
+| Variável | Valor / cuidado |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | URL HTTPS do projeto correto para o ambiente. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Chave pública anon ou publishable, nunca service role. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Segredo somente servidor para provisionamento no Painel Admin. Marcar Sensitive; nunca prefixar `NEXT_PUBLIC_`, logar ou versionar. Ignora RLS: uso restrito à API Admin após gates de autorização. |
+| `APP_URL` | Origem HTTPS canônica do domínio **real**, sem caminho/query/fragmento. Substituir o localhost do exemplo. Usada na recuperação, nunca derivada de Host enviado pelo usuário. |
+
+- Production e Preview separados; Preview usa Supabase de homologação. Não compartilhar segredo de produção com PRs/branches não confiáveis.
+- Framework Next.js, Node 24, instalação `npm ci`, build `npm run build`. Proteger previews; não publicar código-fonte nem listagem de diretórios.
+- Reconstruir após alterar variáveis (as públicas entram no bundle no build). Rotacionar segredos expostos; MFA e menor privilégio em Git/Vercel/Supabase.
+
+### Auth: redirects, SMTP e força bruta
+
+No Supabase, **Authentication → URL Configuration**:
+- Site URL = mesma origem HTTPS real de `APP_URL`.
+- Redirect URLs = origem real + `/auth/callback`, **URL exata**. Evitar wildcards amplos em produção.
+- `http://localhost:3000/auth/callback` apenas no projeto de desenvolvimento; remover previews/localhost desnecessários de produção.
+- Desabilitar cadastro público e login anônimo; configurar SMTP/remetente/templates e testar entrega. Recuperação PKCE exige o mesmo navegador que solicitou o link; callback não aceita destino externo arbitrário.
+
+Em **Authentication → Rate Limits**, revisar cotas disponíveis por endpoint (refresh, verificação, recuperação/OTP e e-mail), ajustar ao volume legítimo e monitorar HTTP 429. Limite de refresh **não equivale** a limite de tentativas de senha. Não aumentar limites só para esconder erros.
+
+Login/recuperação passam por Server Actions: o provedor pode enxergar IP de saída compartilhado do servidor. Testar usuários legítimos e tentativas inválidas/429; complementar com WAF/rate limiting de POSTs de autenticação na borda. Não confiar em `X-Forwarded-For` arbitrário nem inserir service role no cliente de login para contornar cotas. Quota por usuário autenticado não protege login.
+
+Em **Authentication → Sign In / Providers → Email**, habilitar proteção contra senhas vazadas (conforme plano) e revisar força/tamanho da senha. CAPTCHA é camada adicional: **não ativar sem integrar/testar envio do token**, para não quebrar Auth. CAPTCHA não foi implementado nesta entrega.
+
+Referências oficiais: `https://supabase.com/docs/guides/auth/rate-limits`, `https://supabase.com/docs/guides/auth/password-security`, `https://supabase.com/docs/guides/auth/redirect-urls`.
+
+### Controles aplicados / verificados
+
+- CSP com nonce aleatório por requisição no Proxy, repassado ao renderizador Next.js; sem `unsafe-inline`/`unsafe-eval` para scripts em produção. Renderização dinâmica e `private, no-store` evitam HTML estático com nonce reutilizado. Baseline também em `C:\Projetos\Uniguacu\next.config.ts`.
+- X-Frame-Options DENY, frame-ancestors none, nosniff, Referrer-Policy, Permissions-Policy e HSTS de um ano em produção. Sem preload/includeSubDomains antes de inventariar subdomínios.
+- Concessão CSP: estilos inline necessários aos componentes/Radix; **não libera scripts inline**. Origem externa restrita ao Supabase configurado; data/blob para previews. Eval/WebSocket só em desenvolvimento.
+- Rate limit persistente/atômico PostgreSQL, sem dependências extras ou Map em memória: **1 relatório/20 segundos** e **30 empréstimos/devoluções/60 segundos por usuário**. Compartilhado entre instâncias; erro nega operação. RPC deriva `auth.uid()`, verifica conta ativa/permissões e não aceita ator/quota/janela do cliente.
+- Limitação: protege Server Actions, **não é antiddos global nem impede chamadas diretas às RPCs de domínio ou uploads via API Supabase**. Não garante exclusão mútua de relatórios que durem mais de 20 segundos. Complementar com WAF/monitoramento/cotas e teste de carga.
+- Relatórios limitam seções a 10.000 registros e saída base64 a 24 MiB. PDFs são gerados, não recebidos por upload. Checar tamanho final não elimina custo de renderização.
+- Zod no servidor para dados de formulários/Auth/Admin/domínio; tamanho/MIME/assinatura de conteúdo para uploads. React escapa textos; nenhum HTML bruto/eval encontrado no código da aplicação. Excel usa texto, não objetos de fórmula/hyperlink.
+- Service role em módulo server-only. Domínio/relatórios usam sessão e RLS; autorização não depende somente da UI.
+
+### Inspeção remota Supabase (somente leitura)
+
+- **13/13 tabelas públicas com RLS:** products, operations, car_key_lends, sectors, suppliers, collaborators, usuarios, categories, academics, key_lends, lendies, keys, car_keys.
+- **Zero policies de escrita incondicional true** em public/storage. `PERMISSIVE` é modo de composição, não sinônimo de acesso irrestrito. Empréstimos/operações negam DML direto e usam RPCs.
+- RPCs de negócio SECURITY DEFINER têm search_path fixo e verificam identidade ativa/permissões internamente: `auth.uid()`, `private.is_admin`, `private.has_permission`, `private.lending_actor`. Perfil escreve somente no UID próprio; auto-inativação é negada. Event trigger `rls_auto_enable` é infraestrutura, não RPC de negócio; sua execução pública desnecessária será revogada na `0015`.
+- Buckets `product-images`/`profile-images` **privados**, **3 MiB**, JPEG/PNG/WebP. Produto: INSERT exige ADMIN ou leitura+gestão, produto existente e caminho válido. Perfil: INSERT exige UID dono da pasta e ativo. Nenhuma policy UPDATE Storage encontrada; uploads sem upsert.
+- DELETE produto exige gestão, caminho válido e arquivo sem referência (não exige can_delete). Perfil referenciado não pode ser excluído. URLs assinadas têm acesso temporário; não expor em logs.
+
+### Advisor: avisos ainda pendentes
+
+| Aviso | Situação / ação |
+| --- | --- |
+| `anon_security_definer_function_executable`: rls_auto_enable | Correção preparada na `0015`, **pendente remotamente**. Revoga EXECUTE de PUBLIC/anon/authenticated preservando event trigger. Retorno event_trigger não comprova exploração via RPC. |
+| `authenticated_security_definer_function_executable` | 13 funções apontadas: 12 RPCs de negócio intencionais + event trigger. Após migração, revisar RPCs e nova quota como acesso intencional, validando autorização. Não converter para INVOKER/revogar indiscriminadamente quebrando operações. |
+| `auth_leaked_password_protection` | **Desabilitada remotamente**; habilitar no painel conforme plano. |
+
+Remediação: `https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable`, `https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable`, `https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection`.
+
+Correção preparada não significa aviso resolvido no remoto. Rodar Advisor novamente após aplicar/homologar migração e configurar Auth. O serviço retornou timestamps posteriores à data local do ambiente; não usá-los como evidência de etapas futuras.
+
+### Gates antes da liberação
+
+- [ ] Backup/restauração e autorização para homologar/aplicar `0015`; testar quotas concorrentes e isolamento no Postgres.
+- [ ] Resolver proteção de senhas vazadas, revisar grants/Advisor e validar Auth/WAF/429.
+- [ ] Testes reais anon/USER/ADMIN/inativo via API, sem service role: RLS, RPCs, escalada de permissões e uploads fora da pasta/bucket.
+- [ ] E2E autenticado de remoção/undo/substituição de fotos, concorrência e falha de limpeza com editor sem can_delete. Nenhum arquivo real foi excluído nesta auditoria.
+- [ ] Login/logout/recuperação com SMTP e domínio definitivo/redirect allowlist exata.
+- [ ] Preview HTTPS: headers, CSP e console em telas autenticadas; smoke público não substitui E2E.
+- [ ] Monitoramento, alertas de abuso, retenção, revisão de acesso e teste de carga.
+- [ ] Executar validações abaixo e reauditar dependências na data de liberação.
 
 ```powershell
-npm run lint
-npm run typecheck
+Set-Location C:\Projetos\Uniguacu
 npm test
+npm run typecheck
+npm run lint
 npm run build
+npm audit --omit=dev
 ```
 
-Sem Supabase configurado, login/recuperação exibem aviso e não enviam credenciais; rotas autenticadas redirecionam ao login. A home é estrutural, sem indicadores ou operações fictícios. `/product-codes` é apenas o aviso aprovado.
+Testes incluem validação/autorização, PDF/XLSX, headers/CSP e fail-closed do limitador. Asserções estruturais SQL **não substituem execução de migrations ou testes RLS/concorrência no Postgres**. Isto não é pentest completo ou certificação OWASP. Com gates pendentes, **produção não está aprovada**.
 
-Pendências de homologação: banco isolado, testes SQL/API com identidades reais, envio de e-mail/PKCE, cenários autenticados e inativos, conferência remota da baseline, checkout/branch Git e preview Vercel. Storage/upload bloqueado até definição de MIME/tamanho. Fórmula aprovada de distance será migrada no marco de Carro após inventário de dependências. Nenhum banco remoto foi alterado.
+## Evidências desta entrega
+
+- `npm test`: 171 testes aprovados, zero falhas.
+- Typecheck, lint e build de produção aprovados; auditoria npm de dependências de produção sem vulnerabilidades conhecidas no momento da execução.
+- Smoke real com `next start` na porta 3100: login HTTP 200, cinco headers solicitados presentes, 14 scripts com nonce correspondente ao CSP, nonce diferente entre requisições e console sem erros/warnings.
+- Nenhuma dependência instalada, nenhum deploy/push e nenhuma alteração no banco remoto. Não foram executados testes autenticados nem a nova migração no PostgreSQL (ferramentas locais psql/Docker/Supabase CLI não disponíveis).

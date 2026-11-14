@@ -6,9 +6,12 @@ import { lendingPermissions } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { executeLendingCommand } from "@/lib/lending/service";
 import type { LendingResult, LookupResult, LendingOption } from "@/lib/lending/schema";
+import { enforceRateLimit } from "@/lib/security/server-rate-limit";
 
 async function mutate(action: "lend" | "return", input: unknown): Promise<LendingResult> {
   const profile = await requireProfile();
+  const limit = await enforceRateLimit("lending");
+  if (!limit.allowed) return { success: false, uncertain: false, message: limit.message };
   const client = await createClient();
   const result = await executeLendingCommand(action, profile, { rpc: async (name, args) => {
     const { data, error } = await client.rpc(name, args);
