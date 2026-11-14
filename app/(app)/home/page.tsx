@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth/session";
-import { lendingPermissions } from "@/lib/auth/permissions";
+import { lendingPermissions, reportPermissions } from "@/lib/auth/permissions";
+import { parseLoanDetails } from "@/lib/lending/filters";
+import { ReportDownload } from "@/components/reports/report-download";
 import { loadLoans } from "@/lib/lending/queries";
 import { parseLendingQuery, lendingUrl, selectedStatuses } from "@/lib/lending/pagination";
 import { isReturnable, kindLabels, statusLabels } from "@/lib/lending/schema";
@@ -14,20 +16,29 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const profile = await requireProfile();
   const permissions = lendingPermissions(profile);
   if (!permissions.canRead) return <section><h1 className="display-heading text-4xl">Acesso não permitido</h1><p role="alert" className="mt-5">Você não tem permissão para consultar o inventário e os empréstimos.</p></section>;
-  const query = parseLendingQuery(await searchParams);
+  const params = await searchParams;
+  const query = parseLendingQuery(params);
+  const parsedDetails = parseLoanDetails(params);
+  if (!parsedDetails.success) return <section><h1 className="display-heading text-4xl">Filtro inválido</h1><p role="alert" className="my-5">Informe datas válidas, início anterior ao fim e selecione o vínculo ao buscar por nome.</p><Link href="/home" className="underline">Limpar filtros</Link></section>;
+  const details = parsedDetails.data;
+  const url = (page: number, status: string, kind: string) => lendingUrl(page, status, kind, details);
   if (query.invalid) return <section><h1 className="display-heading text-4xl">Filtro inválido</h1><p role="alert" className="my-5">Selecione um status e um tipo de item válidos.</p><Link href="/home" className="underline">Limpar filtros</Link></section>;
-  const result = await loadLoans(query.page, query.status, query.kind);
-  if (result.page !== query.page) redirect(lendingUrl(result.page, query.status, query.kind));
+  const result = await loadLoans(query.page, query.status, query.kind, details);
+  if (result.page !== query.page) redirect(url(result.page, query.status, query.kind));
   const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "UTC" });
   return <>
     <div className="flex flex-wrap items-end justify-between gap-6 border-b border-border pb-8">
       <div><p className="text-xs font-semibold tracking-[.2em] text-muted-foreground">ESPAÇO DE TRABALHO / MOVIMENTAÇÕES</p><h1 className="display-heading mt-3 text-4xl sm:text-5xl">Empréstimos</h1><p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">Produtos, chaves e carros sob responsabilidade de quem usa. Registre a saída e acompanhe o retorno integral.</p></div>
-      <div className="flex flex-col items-start gap-3">{permissions.canLend ? <NewLoan initialKind={query.kind === "car" || query.kind === "key" ? query.kind : "product"} /> : <span className="text-sm text-muted-foreground">Registro de saída não autorizado</span>}</div>
+      <div className="flex flex-col items-start gap-3">{permissions.canLend ? <NewLoan initialKind={query.kind === "car" || query.kind === "key" ? query.kind : "product"} /> : <span className="text-sm text-muted-foreground">Registro de saída não autorizado</span>}{reportPermissions(profile).operational && <ReportDownload request={{ scope: "operational", filters: { status: query.status, kind: query.kind, details } }} />}</div>
     </div>
-    <nav aria-label="Tipos de movimentação" className="mt-7 flex gap-1 overflow-x-auto border-b border-border">{[{ kind: "product", label: "Produtos" }, { kind: "consumable", label: "Consumíveis" }, { kind: "car", label: "Carros" }, { kind: "key", label: "Chaves" }].map((tab) => <Link key={tab.kind} href={lendingUrl(1, tab.kind === "consumable" ? "SEM_DEVOLUCAO" : query.kind === "consumable" ? "ACTIVE" : query.status, tab.kind)} aria-current={query.kind === tab.kind ? "page" : undefined} className={`whitespace-nowrap border-b-3 px-6 py-4 text-sm font-semibold ${query.kind === tab.kind ? "border-primary bg-primary/5 text-primary" : "border-transparent text-muted-foreground hover:bg-muted"}`}>{tab.label}</Link>)}</nav>
-    <form method="get" key={`${query.kind}-${query.status}`} className="my-7 flex flex-wrap items-center gap-4">
+    <nav aria-label="Tipos de movimentação" className="mt-7 flex gap-1 overflow-x-auto border-b border-border">{[{ kind: "product", label: "Produtos" }, { kind: "consumable", label: "Consumíveis" }, { kind: "car", label: "Carros" }, { kind: "key", label: "Chaves" }].map((tab) => <Link key={tab.kind} href={url(1, tab.kind === "consumable" ? "SEM_DEVOLUCAO" : query.kind === "consumable" ? "ACTIVE" : query.status, tab.kind)} aria-current={query.kind === tab.kind ? "page" : undefined} className={`whitespace-nowrap border-b-3 px-6 py-4 text-sm font-semibold ${query.kind === tab.kind ? "border-primary bg-primary/5 text-primary" : "border-transparent text-muted-foreground hover:bg-muted"}`}>{tab.label}</Link>)}</nav>
+    <form method="get" key={JSON.stringify(params)} className="my-7 flex flex-wrap items-center gap-4">
       <input type="hidden" name="kind" value={query.kind} />
       <input type="hidden" name="filtered" value="1" />
+      <label className="text-sm">Saída de<input aria-label="Saída de" type="date" name="start" defaultValue={details.start} className="ml-2 rounded-md border border-input bg-background p-2" /></label>
+      <label className="text-sm">Até<input aria-label="Saída até" type="date" name="end" defaultValue={details.end} className="ml-2 rounded-md border border-input bg-background p-2" /></label>
+      <label className="text-sm">Vínculo<select name="recipientType" defaultValue={details.recipientType} className="ml-2 rounded-md border border-input bg-background p-2"><option value="">Todos</option><option value="collaborator">Colaborador</option><option value="academic">Acadêmico</option></select></label>
+      <label className="text-sm">Nome do destinatário<input name="recipient" maxLength={100} defaultValue={details.recipient} placeholder="Selecione o vínculo para buscar" className="ml-2 rounded-md border border-input bg-background p-2" /></label>
       <fieldset className="flex flex-wrap gap-5"><legend className="sr-only">Status dos empréstimos</legend>{[...([{ value: "EM_ANDAMENTO", label: "Em andamento" }, { value: "ATRASADO", label: "Atrasados" }, { value: "DEVOLVIDO", label: "Devolvidos" }]), ...(query.kind === "consumable" ? [{ value: "SEM_DEVOLUCAO", label: "Consumo registrado" }] : [])].map((filter) => <label key={filter.value} className="flex items-center gap-2 text-sm"><input type="checkbox" name="status" value={filter.value} defaultChecked={selectedStatuses(query.status).includes(filter.value as ReturnType<typeof selectedStatuses>[number])} className="h-4 w-4 accent-primary" />{filter.label}</label>)}</fieldset>
       <Button type="submit">Filtrar</Button><Link href="/home" className="py-3 text-sm underline underline-offset-4">Limpar filtros</Link>
     </form>
@@ -43,7 +54,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           <TableCell className="text-right">{isReturnable(row, profile.id, permissions) ? <ReturnLoan loan={row} /> : <span className="text-xs text-muted-foreground">{row.status === "SEM_DEVOLUCAO" ? "Sem devolução" : row.status === "DEVOLVIDO" ? "Concluído" : !row.request_id || !row.out_at || row.no_return === true ? "Legado: reconciliar antes de devolver" : "Somente leitura"}</span>}</TableCell>
         </TableRow>)}</TableBody>
       </Table>
-      <nav aria-label="Paginação dos empréstimos" className="flex flex-wrap items-center justify-between gap-4 border-t border-border px-6 py-4"><p className="text-xs text-muted-foreground">Página {result.page} de {result.pages} · 10 por página</p><div className="flex gap-3">{result.page > 1 && <Button asChild variant="outline" size="sm"><Link href={lendingUrl(result.page - 1, query.status, query.kind)}>Anterior</Link></Button>}{result.page < result.pages && <Button asChild variant="outline" size="sm"><Link href={lendingUrl(result.page + 1, query.status, query.kind)}>Próxima</Link></Button>}</div></nav>
+      <nav aria-label="Paginação dos empréstimos" className="flex flex-wrap items-center justify-between gap-4 border-t border-border px-6 py-4"><p className="text-xs text-muted-foreground">Página {result.page} de {result.pages} · 10 por página</p><div className="flex gap-3">{result.page > 1 && <Button asChild variant="outline" size="sm"><Link href={url(result.page - 1, query.status, query.kind)}>Anterior</Link></Button>}{result.page < result.pages && <Button asChild variant="outline" size="sm"><Link href={url(result.page + 1, query.status, query.kind)}>Próxima</Link></Button>}</div></nav>
     </div>
   </>;
 }

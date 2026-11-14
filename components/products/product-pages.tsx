@@ -73,5 +73,5 @@ export async function ProductEditPage({ params }: { params: Promise<{ id: string
   if (!data) notFound();
   const product = data as ProductRecord;
   const imageUrl = await signedProductImage(product.id, product.image_path);
-  return <><Link href="/products" className="text-sm underline">← Produtos</Link><h1 className="display-heading mt-6 text-4xl">Editar produto</h1><p className="mt-3 text-sm text-muted-foreground">Atualize o cadastro. O estoque não pode ser alterado nesta tela.</p>{imageUrl && <Image src={imageUrl} alt={`Foto atual de ${product.name}`} width={160} height={160} unoptimized className="mt-6 h-40 w-40 rounded-lg object-cover" />}<ProductForm key={product.id} product={product} options={options} /></>;
+  return <><Link href="/products" className="text-sm underline">← Produtos</Link><h1 className="display-heading mt-6 text-4xl">Editar produto</h1><p className="mt-3 text-sm text-muted-foreground">Atualize o cadastro. O estoque não pode ser alterado nesta tela.</p><ProductForm key={`${product.id}:${product.image_path ?? ""}`} product={product} options={options} imageUrl={imageUrl} /></>;
 }

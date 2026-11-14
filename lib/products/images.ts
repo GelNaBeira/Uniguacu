@@ -13,7 +13,7 @@ export async function validateProductPhoto(form: FormData) {
   return { file: { bytes, type: file.type }, error: imageContentError(bytes, file.type) };
 }
 
-export async function attachProductPhoto(id: string, photo: { bytes: Uint8Array; type: string }, canDelete: boolean): Promise<string | undefined> {
+export async function attachProductPhoto(id: string, photo: { bytes: Uint8Array; type: string }, canManage: boolean): Promise<string | undefined> {
   const client = await createClient();
   const { data: product, error: readError } = await client.from("products").select("image_path").eq("id", id).maybeSingle();
   if (readError || !product) return "Produto salvo, mas a foto não pôde ser vinculada. Abra a edição para tentar novamente.";
@@ -25,14 +25,14 @@ export async function attachProductPhoto(id: string, photo: { bytes: Uint8Array;
   request = product.image_path === null ? request.is("image_path", null) : request.eq("image_path", product.image_path);
   const { data, error } = await request.select("id").maybeSingle();
   if (error || !data) {
-    if (canDelete) {
+    if (canManage) {
       const { error: cleanupError } = await client.storage.from("product-images").remove([path]);
       if (!cleanupError) return "Produto salvo, mas a vinculação da foto falhou ou foi alterada em outra sessão. Atualize a página e tente novamente.";
     }
     return "Produto salvo, mas a foto não foi vinculada. Um arquivo pode ter ficado pendente de limpeza pela administração.";
   }
   if (product.image_path) {
-    if (!canDelete) return "Produto e nova foto salvos. A foto anterior ficou pendente de limpeza pela administração, pois seu perfil não permite excluir arquivos.";
+    if (!canManage) return "Produto e nova foto salvos. A foto anterior ficou pendente de limpeza pela administração, pois seu perfil não permite gerenciar fotos.";
     const { error: cleanupError } = await client.storage.from("product-images").remove([product.image_path]);
     if (cleanupError) return "Produto e nova foto salvos. A limpeza da foto anterior está pendente; informe a administração.";
   }

@@ -35,6 +35,7 @@ export type LoanRow = {
   id: string; kind: LendingKind; itemName: string; recipientName: string; recipientType: "collaborator" | "academic" | null;
   out_date: string; out_at: string | null; status: string | null; created_by: string | null;
   request_id: string | null; quantity: number | null; km_out: number | null; no_return: boolean | null;
+  returned_at?: string | null; km_in?: number | null;
 };
 export function isReturnable(row: LoanRow, actor: string, permissions: { canReturn: boolean; canViewAll: boolean }) {
   return permissions.canReturn && (permissions.canViewAll || row.created_by === actor)

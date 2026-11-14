@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { accessFromForm, accountError, newUserSchema, userAccessSchema, type UserResult } from "@/lib/users/schema";
+import { accessFromForm, accountError, deactivateUserSchema, newUserSchema, userAccessSchema, type UserResult } from "@/lib/users/schema";
 
 export async function createUser(_previous: UserResult, form: FormData): Promise<UserResult> {
   const actor = await requireAdmin();
@@ -36,4 +36,16 @@ export async function updateUserAccess(_previous: UserResult, form: FormData): P
   if (error) return { success: false, message: accountError(error.code) };
   revalidatePath("/", "layout");
   return { success: true, message: "Papel e permissões atualizados." };
+}
+
+export async function deactivateUser(_previous: UserResult, form: FormData): Promise<UserResult> {
+  const actor = await requireAdmin();
+  const parsed = deactivateUserSchema.safeParse({ id: form.get("id"), confirmation: form.get("confirmation") });
+  if (!parsed.success) return { success: false, message: "Confira o usuário e confirme a inativação." };
+  if (parsed.data.id === actor.id.toLowerCase()) return { success: false, message: "Você não pode inativar a própria conta." };
+  const client = await createClient();
+  const { error } = await client.rpc("admin_deactivate_user", { p_id: parsed.data.id });
+  if (error) return { success: false, message: accountError(error.code) };
+  revalidatePath("/", "layout");
+  return { success: true, message: "Conta inativada. O histórico foi preservado e o acesso está bloqueado." };
 }

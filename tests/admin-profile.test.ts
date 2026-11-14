@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { accessFromForm, accessSchema, newUserSchema, userAccessSchema, profileSchema, accountError, permissionLabels } from "../lib/users/schema.ts";
+import { accessFromForm, accessSchema, newUserSchema, userAccessSchema, deactivateUserSchema, profileSchema, accountError, permissionLabels } from "../lib/users/schema.ts";
 import { permissionFlags, hasPermission } from "../lib/auth/permissions.ts";
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
@@ -48,19 +48,43 @@ test("rotas e cada ação administrativa verificam ADMIN; chave restrita a serve
   for (const path of ["layout.tsx", "page.tsx", "users/page.tsx"]) assert.match(read(`app/(app)/admin/${path}`), /await requireAdmin\(\)/);
   const actions = read("app/(app)/admin/actions.ts");
   assert.ok(actions.startsWith('"use server"'));
-  assert.equal((actions.match(/await requireAdmin\(\)/g) ?? []).length, 2);
+  assert.equal((actions.match(/await requireAdmin\(\)/g) ?? []).length, 3);
   assert.ok(actions.indexOf('rpc("admin_user_gate")') < actions.indexOf("createAdminClient()"));
   assert.match(actions, /app_metadata: \{ provisioning:/);
   assert.doesNotMatch(actions, /deleteUser|\.from\("usuarios"\)\.update/);
   assert.ok(read("lib/supabase/admin.ts").startsWith('import "server-only"'));
   for (const component of ["profile-form.tsx", "user-form.tsx"]) assert.doesNotMatch(read(`components/users/${component}`), /SERVICE_ROLE|supabase\/admin/);
 });
-test("inativação ocorre antes do logout, exige confirmação e não exclui histórico", () => {
-  const action = read("app/(app)/perfil/actions.ts");
-  assert.match(action, /form.get\("confirmation"\)/);
-  assert.ok(action.indexOf('rpc("deactivate_my_account")') < action.indexOf("client.auth.signOut"));
-  assert.doesNotMatch(action, /deleteUser|\.delete\(/);
+test("perfil não oferece auto-inativação; ADMIN só vê inativação de terceiros ativos", () => {
+  assert.doesNotMatch(read("app/(app)/perfil/actions.ts"), /deactivate|signOut/);
+  assert.doesNotMatch(read("components/users/profile-form.tsx"), /deactivat|Inativar|confirmation/);
+  assert.match(read("app/(app)/admin/users/page.tsx"), /user.is_active && actor.id !== user.id && <DeactivateUserForm/);
+  assert.match(read("components/users/deactivate-user-form.tsx"), /name="confirmation" required disabled=\{pending\}/);
   assert.match(read("components/app-navigation.tsx"), /role === "ADMIN" && <Link href="\/admin"/);
+});
+test("inativação valida UUID e confirmação e normaliza UUID antes de comparar o próprio ID", () => {
+  const id = "ABCDEF12-1111-4111-8111-111111111111";
+  assert.equal(deactivateUserSchema.parse({ id, confirmation: "on" }).id, id.toLowerCase());
+  for (const input of [{ id, confirmation: null }, { id, confirmation: "true" }, { id: "inválido", confirmation: "on" }]) {
+    assert.equal(deactivateUserSchema.safeParse(input).success, false);
+  }
+  const action = read("app/(app)/admin/actions.ts").split("export async function deactivateUser")[1];
+  assert.match(action, /const actor = await requireAdmin\(\)/);
+  assert.match(action, /parsed.data.id === actor.id.toLowerCase\(\)/);
+  assert.ok(action.indexOf("parsed.data.id === actor.id") < action.indexOf('rpc("admin_deactivate_user"'));
+  assert.doesNotMatch(action, /createAdminClient|signOut|deleteUser|\.delete\(/);
+});
+test("banco rejeita auto-inativação e USER, revoga RPC antiga e preserva último ADMIN", () => {
+  const sql = read("supabase/migrations/0013_admin_deactivation.sql");
+  assert.match(sql, /auth.uid\(\) = p_id/);
+  assert.match(sql, /not private.is_admin\(\)/);
+  assert.match(sql, /auth.uid\(\) = old.id/);
+  assert.match(sql, /old.is_active and not new.is_active/);
+  assert.match(sql, /Último administrador ativo/);
+  assert.match(sql, /pg_advisory_xact_lock\(6012001\)/);
+  assert.match(sql, /revoke all on function public.deactivate_my_account\(\) from public, anon, authenticated/);
+  assert.match(sql, /grant execute on function public.admin_deactivate_user\(uuid\) to authenticated/);
+  assert.doesNotMatch(sql, /disable row level security|delete from|grant update/i);
 });
 test("migração limita RPCs à sessão autenticada e mantém RLS e histórico", () => {
   const sql = read("supabase/migrations/0012_admin_profile.sql");

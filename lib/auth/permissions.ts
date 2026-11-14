@@ -47,3 +47,11 @@ export function lendingPermissions(profile: PermissionProfile) {
     canViewAll: admin || (canRead && hasPermission(profile, "can_view_all_lends")),
   };
 }
+
+export function reportPermissions(profile: PermissionProfile) {
+  const admin = profile.is_active && profile.role === "ADMIN";
+  return {
+    operational: admin || (lendingPermissions(profile).canRead && hasPermission(profile, "can_view_reports")),
+    general: admin,
+  };
+}

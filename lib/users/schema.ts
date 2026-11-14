@@ -15,6 +15,7 @@ export function accessFromForm(form: FormData) {
 }
 export const profileSchema = z.object({ name: z.string().trim().min(2, "Informe um nome com pelo menos 2 caracteres.").max(120) });
 export const userAccessSchema = z.object({ id: z.uuid(), role: z.enum(["ADMIN", "USER"]), limited_access: accessSchema });
+export const deactivateUserSchema = z.object({ id: z.uuid().transform((id) => id.toLowerCase()), confirmation: z.literal("on") });
 export const newUserSchema = profileSchema.extend({
   email: z.string().trim().email("Informe um e-mail válido.").max(254),
   password: z.string().min(12, "A senha inicial deve ter pelo menos 12 caracteres.").max(128),

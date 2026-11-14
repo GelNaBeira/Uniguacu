@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -13,9 +14,10 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { RelationSelect } from "./relation-select";
 
-export function ProductForm({ product, options }: { product?: ProductRecord; options: ProductOptions }) {
+export function ProductForm({ product, options, imageUrl }: { product?: ProductRecord; options: ProductOptions; imageUrl?: string | null }) {
   const router = useRouter();
   const [photo, setPhoto] = useState<File | null>(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
   const [saved, setSaved] = useState<{ id: string; warning: string } | null>(null);
   type Values = ProductEditValues & { qtd?: number };
   const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<Values>({
@@ -30,6 +32,7 @@ export function ProductForm({ product, options }: { product?: ProductRecord; opt
   const onSubmit = handleSubmit(async (values) => {
     if (photo) { const error = imageMetadataError(photo.size, photo.type); if (error) { setError("root", { message: error }); return; } }
     const form = new FormData(); if (photo) form.set("photo", photo);
+    if (removePhoto && product?.image_path) form.set("remove_photo", product.image_path);
     try {
       const result = product ? await updateProduct(product.id, values, form) : await createProduct(values as ProductCreateValues, form);
       if (!result.success) { setError("root", { message: result.message }); return; }
@@ -48,7 +51,16 @@ export function ProductForm({ product, options }: { product?: ProductRecord; opt
     <div className="space-y-2"><label htmlFor="product-note_id" className="text-sm font-semibold">Identificação da nota (opcional)</label><Input id="product-note_id" disabled={isSubmitting} {...register("note_id")} /></div>
     <div className="space-y-2"><label htmlFor="product-description" className="text-sm font-semibold">Descrição (opcional)</label><textarea id="product-description" rows={4} className="w-full rounded-md border border-input bg-background p-3 focus-visible:outline-ring" disabled={isSubmitting} {...register("description")} /></div>
     <fieldset className="space-y-4 rounded-md border border-border p-4"><legend className="px-2 text-sm font-semibold">Código de barras manual</legend><label className="flex items-center gap-3 text-sm"><input type="checkbox" disabled={isSubmitting} {...register("has_barcode")} />Produto possui código de barras</label><div className="space-y-2"><label htmlFor="product-bar_code" className="text-sm font-semibold">Código (texto, opcional)</label><Input id="product-bar_code" disabled={isSubmitting} {...register("bar_code")} /></div><p className="text-xs text-muted-foreground">Sem geração, leitura ou controle de códigos individuais por exemplar no MVP.</p></fieldset>
-    <div className="space-y-2"><label htmlFor="product-photo" className="text-sm font-semibold">Foto do produto (opcional)</label><Input id="product-photo" type="file" accept={IMAGE_ACCEPT} disabled={isSubmitting} aria-describedby="product-photo-help" onChange={(event) => setPhoto(event.target.files?.[0] ?? null)} /><p id="product-photo-help" className="text-xs leading-5 text-muted-foreground">JPEG, PNG ou WebP, até 3 MB. A foto é armazenada em bucket privado.{product?.image_path ? " Selecione um arquivo apenas se desejar substituir a foto atual." : ""}</p></div>
+    <div className="space-y-3">
+      <label htmlFor="product-photo" className="text-sm font-semibold">Foto do produto (opcional)</label>
+      {product && <div className="flex flex-wrap items-center gap-4">
+        {!removePhoto && imageUrl ? <Image src={imageUrl} alt={`Foto atual de ${product.name}`} width={160} height={160} unoptimized className="h-40 w-40 rounded-lg object-cover" /> : <div className="flex h-40 w-40 items-center justify-center rounded-lg border border-border bg-muted text-sm text-muted-foreground">{!removePhoto && product.image_path ? "Foto indisponível" : "Sem foto"}</div>}
+        {product.image_path && !photo && <Button type="button" variant="outline" disabled={isSubmitting} className={removePhoto ? undefined : "border-red-200 text-red-800 hover:bg-red-50"} onClick={() => setRemovePhoto(!removePhoto)}>{removePhoto ? "Desfazer remoção" : "Remover Foto"}</Button>}
+      </div>}
+      {removePhoto && <p role="status" className="text-sm text-muted-foreground">A foto será removida ao salvar o produto.</p>}
+      <Input id="product-photo" type="file" accept={IMAGE_ACCEPT} disabled={isSubmitting} aria-describedby="product-photo-help" onChange={(event) => { const file = event.target.files?.[0] ?? null; setPhoto(file); if (file) setRemovePhoto(false); }} />
+      <p id="product-photo-help" className="text-xs leading-5 text-muted-foreground">JPEG, PNG ou WebP, até 3 MB. A foto é armazenada em bucket privado.{product?.image_path ? " Selecione um arquivo apenas se desejar substituir a foto atual." : ""}</p>
+    </div>
     {errors.root && <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{errors.root.message}</p>}
     <div className="flex flex-wrap gap-3 border-t border-border pt-6"><Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Salvando…" : "Salvar produto"}</Button><Button asChild variant="outline"><Link href="/products">Cancelar</Link></Button></div>
   </form></Card>;

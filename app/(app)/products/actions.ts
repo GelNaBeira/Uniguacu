@@ -8,6 +8,7 @@ import { attachProductPhoto, cleanupProductPhotos, validateProductPhoto } from "
 import { productError, type ProductResult } from "@/lib/products/schema";
 import { stockEntrySchema } from "@/lib/products/stock";
 import { createClient } from "@/lib/supabase/server";
+import { removeProductPhoto } from "@/lib/products/remove-photo";
 import { lendingError, type LendingResult } from "@/lib/lending/schema";
 
 export async function addStock(input: unknown): Promise<LendingResult> {
@@ -34,12 +35,20 @@ async function saveProduct(values: unknown, photoForm: FormData, id?: unknown): 
   try { photo = await validateProductPhoto(photoForm); }
   catch { return { success: false, message: "Não foi possível ler a foto selecionada." }; }
   if (photo.error) return { success: false, message: photo.error };
+  const removePhoto = photoForm.get("remove_photo");
+  if (removePhoto !== null && (id === undefined || typeof removePhoto !== "string" || !removePhoto || photo.file)) {
+    return { success: false, message: "Solicitação de foto inválida. Remova a foto atual ou selecione uma substituta." };
+  }
   const result = await executeProductCommand(profile, await productRepository(), id === undefined ? { type: "create", values } : { type: "update", id, values });
   if (!result.success) return result;
   let warning: string | undefined;
   if (photo.file) {
-    try { warning = await attachProductPhoto(result.id, photo.file, permissions.canDelete); }
+    try { warning = await attachProductPhoto(result.id, photo.file, permissions.canManage); }
     catch { warning = "Produto salvo, mas houve falha no envio da foto. Verifique a edição antes de tentar novamente; um arquivo pode precisar de limpeza."; }
+  }
+  if (typeof removePhoto === "string") {
+    try { warning = await removeProductPhoto(await createClient(), result.id, removePhoto); }
+    catch { warning = "Produto salvo, mas houve falha na remoção da foto. Atualize a página para conferir o resultado antes de tentar novamente."; }
   }
   revalidatePath("/products"); revalidatePath(`/products/${result.id}/edit`);
   return { ...result, warning };

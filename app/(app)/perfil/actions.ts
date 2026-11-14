@@ -1,6 +1,5 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import { requireProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
@@ -32,16 +31,4 @@ export async function saveProfile(_previous: UserResult, form: FormData): Promis
   // Fotos anteriores não são removidas aqui: outra sessão pode estar salvando uma substituição.
   revalidatePath("/", "layout");
   return { success: true, message: "Perfil atualizado." };
-}
-
-export async function deactivateAccount(_previous: UserResult, form: FormData): Promise<UserResult> {
-  await requireProfile();
-  if (form.get("confirmation") !== "on") return { success: false, message: "Confirme que deseja inativar sua conta." };
-  const client = await createClient();
-  const { error } = await client.rpc("deactivate_my_account");
-  if (error) return { success: false, message: accountError(error.code) };
-  await client.auth.signOut({ scope: "global" });
-  // O perfil inativo bloqueia também sessões antigas, mesmo se a revogação do Auth falhar.
-  await client.auth.signOut({ scope: "local" });
-  redirect("/login?status=access");
 }

@@ -20,8 +20,8 @@ export function parseLendingQuery(params: Record<string, string | string[] | und
     invalid: !validStatus || typeof kind !== "string" || !["all", "product", "consumable", "key", "car"].includes(kind),
   };
 }
-export function lendingUrl(page: number, status: string, kind: string) {
-  return `/home?${new URLSearchParams({ page: String(page), status, kind })}`;
+export function lendingUrl(page: number, status: string, kind: string, details: Record<string, string> = {}) {
+  return `/home?${new URLSearchParams({ ...details, page: String(page), status, kind })}`;
 }
 // Mesma ordenação de cada consulta: data de saída e UUID descendentes; tipo desempata.
 export function mergeLoanPage(rows: LoanRow[], page: number) {
