@@ -27,7 +27,8 @@ test("criação valida identidade, senha, papel e permissões sem alterar a senh
   const valid = { name: " Usuário Teste ", email: " teste@example.org ", password: " senha-inicial-123 ", role: "USER", limited_access: access };
   const parsed = newUserSchema.parse(valid);
   assert.equal(parsed.name, "Usuário Teste"); assert.equal(parsed.email, "teste@example.org"); assert.equal(parsed.password, valid.password);
-  for (const patch of [{ password: "curta" }, { email: "errado" }, { role: "admin" }, { name: " " }, { limited_access: {} }]) {
+  assert.equal(newUserSchema.safeParse({ ...valid, password: "123456789012" }).success, true);
+  for (const patch of [{ password: "curta" }, { password: "12345678901" }, { email: "errado" }, { role: "admin" }, { name: " " }, { limited_access: {} }]) {
     assert.equal(newUserSchema.safeParse({ ...valid, ...patch }).success, false);
   }
 });

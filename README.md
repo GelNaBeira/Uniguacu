@@ -21,8 +21,8 @@ Primeiro ADMIN: provisionamento por TI via Auth Admin/painel e promoção contro
 1. Fazer backup, ensaiar restauração e confrontar schema, triggers, funções, policies e grants com o destino.
 2. Em projeto **novo e isolado**, revisar/aplicar `C:\Projetos\Uniguacu\supabase\migrations\0001_initial_schema.sql` até `C:\Projetos\Uniguacu\supabase\migrations\0015_security_hardening.sql`, em ordem, **EXCLUINDO `C:\Projetos\Uniguacu\supabase\migrations\0006a_reset_products.sql` (destrutiva, não faz parte da instalação)**. Existem precondições e migrations não reaplicáveis: homologar a sequência antes de produção.
 3. Em projeto existente, aplicar apenas pendentes após confrontar o histórico remoto. A `0014` já está instalada no Uniguacu (`nfpptemkkgjdagcpuhfv`) como `20261114175607`; **não reaplicar**.
-4. A nova `0015_security_hardening.sql` está preparada, **não aplicada remotamente nesta auditoria**. Revoga execução pública do event trigger `rls_auto_enable` e cria quota persistente por usuário. Não apaga dados de negócio ou Storage.
-5. **Aplicar/homologar a `0015` antes desta versão**: sem a RPC da quota, relatórios e empréstimos falham fechados. Testar anon, USER autorizado, USER sem permissão, ADMIN, inativo e concorrência real.
+4. A `0015_security_hardening.sql` está **aplicada remotamente** no Uniguacu como `20261114220332`, confirmado via MCP. Não reaplicar. Revoga execução pública do event trigger `rls_auto_enable` e cria quota persistente por usuário. Não apaga dados de negócio ou Storage.
+5. Teste remoto transacional com role `authenticated` e identidade ADMIN simulada aprovado: empréstimos 1–30 permitidos/31 bloqueado e relatórios 1 permitido/2 bloqueado, com rollback dos contadores. Isso não substitui testes HTTP autenticados, isolamento de permissões e concorrência real. Sem a RPC da quota, relatórios e empréstimos falham fechados.
 6. Não executar indiscriminadamente os SQLs em `C:\Projetos\Uniguacu\supabase\tests`: há contratos antigos. Revisar e rodar em projeto descartável, sem service role nos testes de RLS.
 
 ## Checklist de deploy — Vercel + Supabase
@@ -52,7 +52,7 @@ Em **Authentication → Rate Limits**, revisar cotas disponíveis por endpoint (
 
 Login/recuperação passam por Server Actions: o provedor pode enxergar IP de saída compartilhado do servidor. Testar usuários legítimos e tentativas inválidas/429; complementar com WAF/rate limiting de POSTs de autenticação na borda. Não confiar em `X-Forwarded-For` arbitrário nem inserir service role no cliente de login para contornar cotas. Quota por usuário autenticado não protege login.
 
-Em **Authentication → Sign In / Providers → Email**, habilitar proteção contra senhas vazadas (conforme plano) e revisar força/tamanho da senha. CAPTCHA é camada adicional: **não ativar sem integrar/testar envio do token**, para não quebrar Auth. CAPTCHA não foi implementado nesta entrega.
+Em **Authentication → Sign In / Providers → Email**, configurar mínimo de **12 caracteres**. Criação de usuários e recuperação na aplicação exigem esse mínimo; a configuração global do Auth **ainda precisa ser confirmada no painel**, pois o MCP disponível não altera essa configuração. Proteção contra senhas vazadas indisponível no Free: **risco residual aceito pelo responsável**, sem upgrade. Senhas maiores não equivalem à consulta de vazamentos. CAPTCHA é camada adicional: **não ativar sem integrar/testar envio do token**, para não quebrar Auth. CAPTCHA não foi implementado nesta entrega.
 
 Referências oficiais: `https://supabase.com/docs/guides/auth/rate-limits`, `https://supabase.com/docs/guides/auth/password-security`, `https://supabase.com/docs/guides/auth/redirect-urls`.
 
@@ -79,18 +79,21 @@ Referências oficiais: `https://supabase.com/docs/guides/auth/rate-limits`, `htt
 
 | Aviso | Situação / ação |
 | --- | --- |
-| `anon_security_definer_function_executable`: rls_auto_enable | Correção preparada na `0015`, **pendente remotamente**. Revoga EXECUTE de PUBLIC/anon/authenticated preservando event trigger. Retorno event_trigger não comprova exploração via RPC. |
-| `authenticated_security_definer_function_executable` | 13 funções apontadas: 12 RPCs de negócio intencionais + event trigger. Após migração, revisar RPCs e nova quota como acesso intencional, validando autorização. Não converter para INVOKER/revogar indiscriminadamente quebrando operações. |
-| `auth_leaked_password_protection` | **Desabilitada remotamente**; habilitar no painel conforme plano. |
+| `anon_security_definer_function_executable`: rls_auto_enable | **Resolvido**, ausente no Advisor após `0015`. EXECUTE negado a anon/authenticated, preservando event trigger. |
+| `authenticated_security_definer_function_executable` | 13 funções apontadas: 12 RPCs de negócio + quota. Revisar autorização como acesso intencional. Não converter para INVOKER/revogar indiscriminadamente quebrando operações. |
+| `auth_leaked_password_protection` | **Desabilitada remotamente; risco aceito no Free**. Mínimo de 12 na aplicação; confirmar configuração global no painel. |
+| `rls_enabled_no_policy` | Informativo esperado em `private.action_rate_limits`: sem acesso direto de anon/authenticated; consumo via RPC. |
 
 Remediação: `https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable`, `https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable`, `https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection`.
 
-Correção preparada não significa aviso resolvido no remoto. Rodar Advisor novamente após aplicar/homologar migração e configurar Auth. O serviço retornou timestamps posteriores à data local do ambiente; não usá-los como evidência de etapas futuras.
+Advisor reconsultado via MCP: sem alerta de execução anônima do event trigger; permanecem os avisos descritos acima. O serviço retornou timestamps posteriores à data local do ambiente; preservar versões remotas literalmente, sem usá-las como data local de execução.
 
 ### Gates antes da liberação
 
-- [ ] Backup/restauração e autorização para homologar/aplicar `0015`; testar quotas concorrentes e isolamento no Postgres.
-- [ ] Resolver proteção de senhas vazadas, revisar grants/Advisor e validar Auth/WAF/429.
+- [x] `0015` aplicada e teste sequencial transacional remoto aprovado.
+- [x] Limitação de proteção contra senhas vazadas aceita no plano Free pelo responsável.
+- [ ] Backup/restauração; testar quotas concorrentes e isolamento no Postgres.
+- [ ] Confirmar mínimo global de 12 caracteres no Supabase Auth, revisar grants/Advisor e validar Auth/WAF/429.
 - [ ] Testes reais anon/USER/ADMIN/inativo via API, sem service role: RLS, RPCs, escalada de permissões e uploads fora da pasta/bucket.
 - [ ] E2E autenticado de remoção/undo/substituição de fotos, concorrência e falha de limpeza com editor sem can_delete. Nenhum arquivo real foi excluído nesta auditoria.
 - [ ] Login/logout/recuperação com SMTP e domínio definitivo/redirect allowlist exata.
@@ -114,4 +117,5 @@ Testes incluem validação/autorização, PDF/XLSX, headers/CSP e fail-closed do
 - `npm test`: 171 testes aprovados, zero falhas.
 - Typecheck, lint e build de produção aprovados; auditoria npm de dependências de produção sem vulnerabilidades conhecidas no momento da execução.
 - Smoke real com `next start` na porta 3100: login HTTP 200, cinco headers solicitados presentes, 14 scripts com nonce correspondente ao CSP, nonce diferente entre requisições e console sem erros/warnings.
-- Nenhuma dependência instalada, nenhum deploy/push e nenhuma alteração no banco remoto. Não foram executados testes autenticados nem a nova migração no PostgreSQL (ferramentas locais psql/Docker/Supabase CLI não disponíveis).
+- Atualização via MCP: histórico remoto confirma `0015` como `20261114220332`; teste sequencial da quota aprovado sob role `authenticated`, sem service role, com JWT subject simulado e rollback. Não equivale a sessão HTTP real. Nenhum registro de negócio ou arquivo Storage alterado por esse teste.
+- Nenhuma dependência instalada ou deploy/push realizado. Testes HTTP autenticados e concorrência real continuam pendentes.

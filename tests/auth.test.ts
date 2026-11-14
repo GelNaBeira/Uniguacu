@@ -11,10 +11,14 @@ test("login valida e-mail e não altera senha", () => {
   assert.equal(value.email, "a@example.org");
 });
 test("recuperação rejeita email ausente", () => assert.equal(emailSchema.safeParse(null).success, false));
-test("reset exige confirmação igual e oito caracteres", () => {
+test("reset exige confirmação igual e no mínimo 12 caracteres", () => {
   assert.equal(resetSchema.safeParse({ password: "123", confirmation: "123" }).success, false);
   assert.equal(resetSchema.safeParse({ password: "12345678", confirmation: "diferente" }).success, false);
-  assert.equal(resetSchema.safeParse({ password: "SenhaLonga!", confirmation: "SenhaLonga!" }).success, true);
+  assert.equal(resetSchema.safeParse({ password: "12345678901", confirmation: "12345678901" }).success, false);
+  assert.equal(resetSchema.safeParse({ password: "SenhaLonga12!", confirmation: "diferente" }).success, false);
+  assert.equal(resetSchema.safeParse({ password: "SenhaLonga12!", confirmation: "SenhaLonga12!" }).success, true);
+  const password = " senha longa ";
+  assert.equal(resetSchema.parse({ password, confirmation: password }).password, password);
 });
 test("ambiente ausente ou URL insegura falha fechado", () => {
   const oldUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
