@@ -6,6 +6,25 @@ import { productRepository } from "@/lib/products/repository";
 import { executeProductCommand } from "@/lib/products/service";
 import { attachProductPhoto, cleanupProductPhotos, validateProductPhoto } from "@/lib/products/images";
 import { productError, type ProductResult } from "@/lib/products/schema";
+import { stockEntrySchema } from "@/lib/products/stock";
+import { createClient } from "@/lib/supabase/server";
+import { lendingError, type LendingResult } from "@/lib/lending/schema";
+
+export async function addStock(input: unknown): Promise<LendingResult> {
+  const profile = await requireProfile();
+  if (!productPermissions(profile).canManage) return { success: false, message: productError("42501"), uncertain: false };
+  const parsed = stockEntrySchema.safeParse(input);
+  if (!parsed.success) return { success: false, message: parsed.error.issues[0]?.message ?? "Confira os dados da entrada.", uncertain: false };
+  const values = parsed.data;
+  try {
+    const client = await createClient();
+    const { data, error } = await client.rpc("add_product_stock", { p_product_id: values.productId, p_quantity: values.quantity, p_date: values.date, p_note: values.note, p_request_id: values.requestId });
+    if (error) return { success: false, ...lendingError(error.code) };
+    if (typeof data !== "string") return { success: false, ...lendingError() };
+    revalidatePath("/products"); revalidatePath("/home"); revalidatePath(`/products/${values.productId}/edit`);
+    return { success: true, id: data };
+  } catch { return { success: false, ...lendingError() }; }
+}
 
 async function saveProduct(values: unknown, photoForm: FormData, id?: unknown): Promise<ProductResult> {
   const profile = await requireProfile();

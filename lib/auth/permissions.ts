@@ -36,3 +36,14 @@ export function resourcePermissions(profile: PermissionProfile, entity: "keys" |
   const canManage = admin || (canRead && hasPermission(profile, entity === "keys" ? "can_manage_keys" : "can_manage_cars"));
   return { canRead, canManage, canDelete: admin || (canManage && hasPermission(profile, "can_delete")), canCorrectMileage: admin && entity === "cars" };
 }
+
+export function lendingPermissions(profile: PermissionProfile) {
+  const admin = profile.is_active && profile.role === "ADMIN";
+  const canRead = admin || hasPermission(profile, "can_read_inventory");
+  return {
+    canRead,
+    canLend: admin || (canRead && hasPermission(profile, "can_lend")),
+    canReturn: admin || (canRead && hasPermission(profile, "can_return")),
+    canViewAll: admin || (canRead && hasPermission(profile, "can_view_all_lends")),
+  };
+}

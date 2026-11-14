@@ -1,4 +1,5 @@
 import "server-only";
+import { v4 as uuidv4 } from "uuid";
 import { createClient } from "@/lib/supabase/server";
 import { imageContentError, imageExtension, imageMetadataError } from "./image-validation";
 import { productIdSchema } from "./schema";
@@ -16,7 +17,7 @@ export async function attachProductPhoto(id: string, photo: { bytes: Uint8Array;
   const client = await createClient();
   const { data: product, error: readError } = await client.from("products").select("image_path").eq("id", id).maybeSingle();
   if (readError || !product) return "Produto salvo, mas a foto não pôde ser vinculada. Abra a edição para tentar novamente.";
-  const path = `${id}/${crypto.randomUUID()}.${imageExtension(photo.type)}`;
+  const path = `${id}/${uuidv4()}.${imageExtension(photo.type)}`;
   const { error: uploadError } = await client.storage.from("product-images").upload(path, photo.bytes, { contentType: photo.type, upsert: false, cacheControl: "300" });
   if (uploadError) return "Produto salvo, mas o envio da foto falhou. Abra a edição para tentar novamente.";
   let request = client.from("products").update({ image_path: path }).eq("id", id);

@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { v4 as uuidv4 } from "uuid";
 import { requireProfile } from "@/lib/auth/session";
 import { categoryRepository } from "@/lib/categories/repository";
 import { executeCategoryCommand } from "@/lib/categories/service";
@@ -8,7 +9,7 @@ import { catalogPermissions } from "@/lib/auth/permissions";
 import { authDiagnostic } from "@/lib/auth/diagnostics";
 
 async function categoryContext(operation: "create" | "update" | "delete") {
-  const requestId = crypto.randomUUID();
+  const requestId = uuidv4();
   const profile = await requireProfile(requestId);
   const permissions = catalogPermissions(profile);
   authDiagnostic("categories.authorization", {

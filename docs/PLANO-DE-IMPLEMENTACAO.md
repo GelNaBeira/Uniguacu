@@ -1,6 +1,6 @@
 # Plano de Implementação — Almoxarifado Uniguacu
 
-**Estado em 13/11/2026:** Fase 3 / Marco 5 autorizado, dividido em backend e interface. Marcos 1–4 concluídos e commitados; cliente confirmou 0007/0008 aplicadas e Marco 4 oficialmente homologado. Etapa 1: 0009 aplicada no Supabase de desenvolvimento via MCP, registrada como `20261113125615_0009_lending_rpcs`; lend_product validada com produto existente (estoque 1 → 0 → 1) e seis RPCs/autorização testadas em transações com rollback. Concorrência entre conexões, falha injetada no histórico e gateway HTTP/JWT ainda pendentes; etapa 2 (/home) ainda não iniciada. Contratos e evidências em `C:\Projetos\Uniguacu\docs\MARCO-5-BACKEND.md`.
+**Estado em 13/11/2026:** Fase 3 / Marco 5 em homologação. Marcos 1–4 concluídos; backend da 0009 aplicado e testado no Supabase. Etapa 2 (/home) implementada: listagem unificada paginada, saídas e devoluções integrais por Server Actions/RPC, permissões e UUID de retry. Testes, lint, typecheck e build executados; aguardando validação no navegador autenticado. Gates de concorrência entre conexões, falha injetada e HTTP/JWT permanecem pendentes. Evidências: `C:\Projetos\Uniguacu\docs\MARCO-5-BACKEND.md` e `C:\Projetos\Uniguacu\docs\MARCO-5-HOME.md`.
 **Raiz de referência:** `C:\Projetos\Uniguacu\`.  
 **Contrato:** `C:\Projetos\Uniguacu\docs\PDD.md`; fonte funcional exclusiva: `C:\Projetos\Uniguacu\docs\MAPA-FUNCIONAL.md`. SQL local de baseline: `C:\Projetos\Uniguacu\supabase\migrations\0001_initial_schema.sql`.
 
@@ -12,7 +12,7 @@
 | 2 — Cadastros básicos | Concluído; homologação registrada no documento do Marco 3 | `2477896`, 11/11/2026 |
 | 3 — Produtos | Concluído no escopo MVP aprovado; integração real banco/Storage depende das evidências de homologação | `08258a0`, 11/11/2026 |
 | 4 — Chaves e carros | Oficialmente homologado pelo cliente em 13/11/2026; 0007/0008 aplicadas e CRUD validado no navegador | `9850249`, `00836db` e correção `78ac253` |
-| 5 — Empréstimos e devoluções | Backend 0009 aplicado e seis RPCs testadas no Supabase de desenvolvimento; concorrência/HTTP e interface pendentes | Alterações locais desta etapa ainda sem commit |
+| 5 — Empréstimos e devoluções | Backend 0009 aplicado; Home implementada com listagem, saídas e devoluções via RPC; homologação visual e gates concorrência/HTTP pendentes | Etapa 2 local ainda sem commit; roteiro em `C:\Projetos\Uniguacu\docs\MARCO-5-HOME.md` |
 | 6 — Histórico/admin/perfil/ajuda e relatórios | Planejado; não implementado | Sem commit de implementação |
 
 Registros detalhados: `C:\Projetos\Uniguacu\docs\MARCO-1.md`, `C:\Projetos\Uniguacu\docs\MARCO-2-CATEGORIES.md`, `C:\Projetos\Uniguacu\docs\MARCO-2-ENTIDADES-SIMPLES.md`, `C:\Projetos\Uniguacu\docs\MARCO-3-PRODUTOS.md` e `C:\Projetos\Uniguacu\docs\MARCO-4-CHAVES-E-CARROS.md`. Conclusão de código não substitui os gates de banco, segurança e aceite operacional abaixo.

@@ -13,7 +13,7 @@ export const supplierSchema = z.object({
 export const collaboratorSchema = z.object({
   name: requiredName, identification: optionalText, role_function: optionalText, phone: optionalText,
 }).strict();
-export const academicSchema = z.object({ name: requiredName, ra: optionalText, course: optionalText }).strict();
+export const academicSchema = z.object({ name: requiredName, ra: optionalText, course: optionalText, phone: optionalText.optional() }).strict();
 export const catalogEntitySchema = z.enum(["sectors", "suppliers", "collaborators", "academics"]);
 export const catalogIdSchema = z.string().uuid("Identificador inválido.");
 export type CatalogEntity = z.infer<typeof catalogEntitySchema>;
@@ -43,7 +43,7 @@ export const catalogs: Record<CatalogEntity, CatalogConfig> = {
   },
   academics: {
     title: "Acadêmicos", singular: "Acadêmico", newTitle: "Novo acadêmico", editTitle: "Editar acadêmico", nameColumn: "name",
-    fields: [{ name: "name", label: "Nome", required: true }, { name: "ra", label: "RA" }, { name: "course", label: "Curso" }], schema: academicSchema,
+    fields: [{ name: "name", label: "Nome", required: true }, { name: "ra", label: "RA" }, { name: "course", label: "Curso" }, { name: "phone", label: "Telefone" }], schema: academicSchema,
   },
 };
 

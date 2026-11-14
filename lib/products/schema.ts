@@ -5,7 +5,7 @@ const price = z.string().trim().refine((value) => !value || /^\d{1,10}([.,]\d{1,
 const fields = {
   name: z.string().trim().min(1, "Informe o nome do produto."),
   price, bar_code: z.string().trim(), note_id: z.string().trim(), description: z.string().trim(),
-  has_barcode: z.boolean(), category_id: relation, sector_id: relation, supplier_id: relation,
+  has_barcode: z.boolean(), is_consumable: z.boolean().optional(), category_id: relation, sector_id: relation, supplier_id: relation,
 };
 export const productEditSchema = z.object(fields).strict();
 export const quantitySchema = z.number().int("Informe uma quantidade inteira.").min(0, "A quantidade não pode ser negativa.").max(2147483647, "Quantidade acima do limite permitido.");
@@ -15,16 +15,17 @@ export type ProductEditValues = z.infer<typeof productEditSchema>;
 export type ProductCreateValues = z.infer<typeof productCreateSchema>;
 export type ProductRecord = {
   id: string; name: string; qtd: number; price: number | null; bar_code: string | null;
-  note_id: string | null; description: string | null; has_barcode: boolean | null;
+  note_id: string | null; description: string | null; has_barcode: boolean | null; is_consumable: boolean;
   category_id: string | null; sector_id: string | null; supplier_id: string | null; image_path: string | null;
 };
-export const PRODUCT_COLUMNS = "id,name,qtd,price,bar_code,note_id,description,has_barcode,category_id,sector_id,supplier_id,image_path";
+export const PRODUCT_COLUMNS = "id,name,qtd,price,bar_code,note_id,description,has_barcode,is_consumable,category_id,sector_id,supplier_id,image_path";
 export type ProductResult = { success: true; id: string; warning?: string } | { success: false; message: string };
 export function productPayload(values: ProductEditValues | ProductCreateValues) {
   return {
     name: values.name, price: values.price ? values.price.replace(",", ".") : null,
     bar_code: values.bar_code || null, note_id: values.note_id || null, description: values.description || null,
     has_barcode: values.has_barcode, category_id: values.category_id || null,
+    ...(values.is_consumable !== undefined ? { is_consumable: values.is_consumable } : {}),
     sector_id: values.sector_id || null, supplier_id: values.supplier_id || null,
     ...("qtd" in values ? { qtd: values.qtd } : {}),
   };
