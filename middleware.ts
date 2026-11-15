@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getPublicEnv } from "@/lib/supabase/env";
 import { contentSecurityPolicy } from "@/lib/security/headers";
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const csp = contentSecurityPolicy(nonce, process.env.NODE_ENV === "production", process.env.NEXT_PUBLIC_SUPABASE_URL);
   const requestHeaders = new Headers(request.headers);

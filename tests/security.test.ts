@@ -56,7 +56,9 @@ test("integração: limiter precede trabalho caro e SQL não aceita identidade/q
   assert.match(sql, /revoke execute on function public.rls_auto_enable\(\) from public, anon, authenticated/);
   assert.match(sql, /grant execute on function public.consume_action_rate_limit\(text\) to authenticated/);
   assert.match(sql, /create function public.consume_action_rate_limit\(p_scope text\)/);
-  assert.match(read("proxy.ts"), /requestHeaders.set\("x-nonce", nonce\)/);
+  const middleware = read("middleware.ts");
+  assert.match(middleware, /export async function middleware\(request: NextRequest\)/);
+  assert.match(middleware, /requestHeaders.set\("x-nonce", nonce\)/);
   assert.match(read("app/layout.tsx"), /await connection\(\)/);
 });
 
