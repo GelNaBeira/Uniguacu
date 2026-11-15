@@ -1,5 +1,5 @@
 export type RateLimitScope = "reports" | "lending";
-export const rateLimitMessage = "Muitas solicitações. Aguarde um minuto antes de tentar novamente.";
+export const rateLimitMessage = "Muitas solicitações. Aguarde alguns segundos antes de tentar novamente.";
 
 /** A separate, committed RPC request makes quotas survive concurrent actions/instances. */
 export async function checkRateLimit(scope: RateLimitScope, consume: (scope: RateLimitScope) => Promise<{ data: unknown; error: unknown }>) {
